@@ -1,0 +1,810 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>心晴 · 情绪天气陪伴</title>
+<style>
+  :root{
+    --bg:#ECE6DC;
+    --surface:#FFFFFF;
+    --ink:#2B2622;
+    --muted:#8A8178;
+    --faint:#B4ABA0;
+    --border:#EEE7DC;
+    --accent:#E8684A;
+    --accent-soft:#FBEAE3;
+    --serif:"Songti SC","STSong","Noto Serif SC",serif;
+    --sans:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei","Segoe UI",sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{background:var(--bg);font-family:var(--sans);color:var(--ink)}
+  body{padding:28px 0 40px 28px;min-height:100vh}
+
+  .phone{
+    width:400px;height:860px;background:var(--surface);
+    border-radius:42px;overflow:hidden;position:relative;
+    box-shadow:0 30px 80px -20px rgba(60,45,30,.35),0 6px 20px rgba(60,45,30,.12);
+    display:flex;flex-direction:column;
+  }
+
+  /* status bar */
+  .statusbar{
+    height:46px;display:flex;align-items:center;justify-content:space-between;
+    padding:0 26px;font-size:13px;font-weight:600;flex:0 0 46px;color:var(--ink);
+  }
+  .statusbar .dots{letter-spacing:1px}
+
+  /* screen header */
+  .header{
+    padding:6px 22px 14px;flex:0 0 auto;
+    display:flex;align-items:flex-end;justify-content:space-between;
+  }
+  .header h1{font-family:var(--serif);font-size:26px;font-weight:700;letter-spacing:.5px}
+  .header .sub{color:var(--muted);font-size:12px;margin-top:3px}
+
+  /* content area */
+  .screen{
+    flex:1 1 auto;overflow-y:auto;display:none;flex-direction:column;
+    scrollbar-width:none;
+  }
+  .screen::-webkit-scrollbar{display:none}
+  .screen.active{display:flex}
+
+  /* bottom nav */
+  .tabbar{
+    flex:0 0 auto;display:flex;border-top:1px solid var(--border);
+    background:var(--surface);padding:8px 10px 14px;
+  }
+  .tab{
+    flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;
+    cursor:pointer;color:var(--faint);font-size:11px;padding:6px 0;
+    transition:color .18s;border:none;background:none;font-family:var(--sans);
+  }
+  .tab svg{width:22px;height:22px}
+  .tab.active{color:var(--accent);font-weight:600}
+
+  /* ============ CHAT ============ */
+  .mode-pill{font-size:11px;padding:3px 10px;border-radius:999px;background:var(--accent-soft);color:var(--accent);font-weight:600;border:1px solid #F3C9BC;white-space:nowrap}
+  .weather-chip{
+    margin:2px 22px 14px;padding:11px 14px;border-radius:14px;
+    background:#F6F1E9;display:flex;align-items:center;gap:10px;font-size:12.5px;color:#6B6258;
+  }
+  .weather-chip b{color:var(--ink)}
+  .chat-scroll{flex:1 1 auto;overflow-y:auto;padding:4px 22px 12px;display:flex;flex-direction:column;gap:14px;scrollbar-width:none}
+  .chat-scroll::-webkit-scrollbar{display:none}
+  .day-sep{align-self:center;font-size:11px;color:var(--faint);margin-top:6px}
+  .msg{max-width:80%;padding:12px 14px;border-radius:18px;font-size:14.5px;line-height:1.55;position:relative;animation:pop .25s ease;white-space:pre-wrap;word-break:break-word}
+  @keyframes pop{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  .msg.ai{align-self:flex-start;background:var(--surface);border:1px solid var(--border);border-bottom-left-radius:6px}
+  .msg.user{align-self:flex-end;background:var(--accent);color:#fff;border-bottom-right-radius:6px}
+  .emotag{
+    align-self:flex-end;display:inline-flex;align-items:center;gap:4px;
+    font-size:11px;color:var(--muted);margin-top:-8px;margin-bottom:4px;
+    background:var(--surface);border:1px solid var(--border);border-radius:999px;
+    padding:2px 9px;
+  }
+  .emotag .dot{width:7px;height:7px;border-radius:50%}
+  .typing{align-self:flex-start;display:flex;gap:4px;padding:14px 16px;border:1px solid var(--border);border-radius:18px;border-bottom-left-radius:6px}
+  .typing span{width:7px;height:7px;border-radius:50%;background:var(--faint);animation:blink 1.2s infinite}
+  .typing span:nth-child(2){animation-delay:.2s}
+  .typing span:nth-child(3){animation-delay:.4s}
+  @keyframes blink{0%,60%,100%{opacity:.3}30%{opacity:1}}
+
+  .composer{flex:0 0 auto;display:flex;gap:10px;padding:12px 18px 16px;border-top:1px solid var(--border);background:var(--surface)}
+  .composer input{
+    flex:1;border:1px solid var(--border);border-radius:999px;padding:12px 16px;
+    font-size:14.5px;font-family:var(--sans);background:#FAF7F2;color:var(--ink);outline:none;
+  }
+  .composer input:focus{border-color:var(--accent)}
+  .send{
+    width:46px;height:46px;border-radius:50%;border:none;background:var(--accent);
+    color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;
+    flex:0 0 46px;transition:transform .12s;
+  }
+  .send:active{transform:scale(.92)}
+  .send svg{width:20px;height:20px}
+
+  /* ============ MOOD ============ */
+  .seg{margin:2px 22px 16px;display:flex;background:#F3EEE5;border-radius:12px;padding:4px}
+  .seg button{flex:1;border:none;background:none;padding:8px 0;border-radius:9px;font-size:13px;font-family:var(--sans);color:var(--muted);cursor:pointer;transition:all .15s}
+  .seg button.active{background:var(--surface);color:var(--ink);font-weight:600;box-shadow:0 2px 6px rgba(60,45,30,.08)}
+
+  .calwrap{padding:0 22px}
+  .calhead{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+  .calhead .mon{font-family:var(--serif);font-size:18px;font-weight:700}
+  .calhead .navbtns{display:flex;gap:6px}
+  .calhead .navbtns button{width:30px;height:30px;border-radius:9px;border:1px solid var(--border);background:var(--surface);color:var(--ink);cursor:pointer;font-size:14px}
+  .calgrid{display:grid;grid-template-columns:repeat(7,1fr);gap:5px}
+  .calgrid .dow{text-align:center;font-size:11px;color:var(--faint);padding:4px 0}
+  .day{
+    aspect-ratio:1;border-radius:11px;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;font-size:12.5px;color:var(--ink);
+    cursor:pointer;position:relative;transition:transform .12s;
+  }
+  .day:hover{transform:scale(1.06)}
+  .day.blank{visibility:hidden}
+  .day .w{font-size:9px;opacity:.7;line-height:1}
+  .day.today{outline:2px solid var(--accent);outline-offset:1px}
+  .day.selected{box-shadow:0 0 0 2px var(--ink) inset}
+
+  .summary{display:flex;gap:10px;padding:16px 22px 4px}
+  .scard{flex:1;background:#FAF7F2;border:1px solid var(--border);border-radius:16px;padding:12px 14px}
+  .scard .k{font-size:11px;color:var(--muted)}
+  .scard .v{font-size:20px;font-weight:700;margin-top:4px;font-family:var(--serif)}
+  .scard .v small{font-size:12px;color:var(--muted);font-weight:400;font-family:var(--sans)}
+
+  .trend{padding:16px 22px 6px}
+  .trend .tlabel{font-size:12px;color:var(--muted);margin-bottom:8px}
+  .trend svg{width:100%;height:64px;display:block}
+
+  .entries{padding:10px 22px 20px}
+  .entries .elabel{font-size:12px;color:var(--muted);margin-bottom:8px}
+  .entry{display:flex;align-items:center;gap:12px;padding:11px 12px;border:1px solid var(--border);border-radius:14px;margin-bottom:8px;background:var(--surface)}
+  .entry .edot{width:10px;height:10px;border-radius:50%;flex:0 0 10px}
+  .entry .ename{font-weight:600;font-size:14px}
+  .entry .edate{margin-left:auto;font-size:11.5px;color:var(--faint)}
+  .entry .eweather{font-size:12px;color:var(--muted)}
+  .entry .enote{font-size:12.5px;color:var(--muted);margin-top:2px}
+
+  /* ============ WEATHER ============ */
+  .wcard{margin:2px 22px 14px;border-radius:20px;padding:18px 18px 16px;color:#fff;position:relative;overflow:hidden}
+  .wcard .big{font-size:52px;font-weight:700;font-family:var(--serif);line-height:1}
+  .wcard .city{font-size:13px;opacity:.9;margin-top:6px}
+  .wcard .predict{margin-top:14px;padding:11px 13px;background:rgba(255,255,255,.18);border-radius:12px;font-size:13px;backdrop-filter:blur(2px)}
+  .wcard .predict b{font-size:14px}
+  .wcard .wp{position:absolute;right:16px;top:16px;font-size:40px}
+
+  .forecast{display:flex;gap:8px;padding:0 22px 4px;overflow-x:auto;scrollbar-width:none}
+  .forecast::-webkit-scrollbar{display:none}
+  .fday{flex:0 0 56px;text-align:center;padding:12px 4px;border:1px solid var(--border);border-radius:16px;background:#FAF7F2}
+  .fday .fw{font-size:20px}
+  .fday .fd{font-size:11px;color:var(--muted);margin:6px 0 8px}
+  .fday .ft{font-size:11px;font-weight:600}
+  .fday .fm{width:18px;height:18px;border-radius:50%;margin:8px auto 0}
+  .fday.today{border-color:var(--accent);background:var(--accent-soft)}
+
+  .insights{padding:18px 22px 6px}
+  .insights .ilabel{font-size:12px;color:var(--muted);margin-bottom:10px}
+  .insight{display:flex;align-items:center;gap:12px;padding:13px 14px;border:1px solid var(--border);border-radius:16px;margin-bottom:9px;background:var(--surface)}
+  .insight .iw{font-size:24px}
+  .insight .itx{flex:1}
+  .insight .itx .t{font-size:13.5px;font-weight:600}
+  .insight .itx .d{font-size:11.5px;color:var(--muted);margin-top:2px}
+  .insight .pct{font-size:16px;font-weight:700;font-family:var(--serif);color:var(--accent)}
+  .bar{height:5px;border-radius:3px;background:var(--border);margin-top:6px;overflow:hidden}
+  .bar i{display:block;height:100%;border-radius:3px}
+
+  .care{margin:14px 22px 22px;padding:16px;border-radius:18px;background:#F0F4F2;border:1px solid #DDE8E3}
+  .care .ct{font-size:12px;color:#5B7568;font-weight:600;letter-spacing:1px}
+  .care .cm{font-size:14.5px;margin-top:8px;line-height:1.6}
+
+  /* ============ SETTINGS ============ */
+  .me{padding:18px 22px 6px;display:flex;align-items:center;gap:14px}
+  .avatar{width:58px;height:58px;border-radius:20px;background:var(--accent-soft);display:flex;align-items:center;justify-content:center;font-size:30px}
+  .me .nm{font-family:var(--serif);font-size:20px;font-weight:700}
+  .me .ds{font-size:12px;color:var(--muted);margin-top:3px}
+
+  .section{padding:18px 22px 4px}
+  .section .slabel{font-size:12px;color:var(--muted);margin-bottom:10px}
+  .row{display:flex;align-items:center;gap:12px;padding:13px 14px;border:1px solid var(--border);border-radius:14px;margin-bottom:8px;background:var(--surface)}
+  .row .rem{font-size:22px}
+  .row .rtx{flex:1}
+  .row .rtx .t{font-size:14px;font-weight:600}
+  .row .rtx .d{font-size:11.5px;color:var(--muted);margin-top:2px}
+  .switch{width:44px;height:26px;border-radius:999px;background:var(--border);position:relative;cursor:pointer;transition:background .18s;flex:0 0 44px}
+  .switch::after{content:"";position:absolute;width:20px;height:20px;border-radius:50%;background:#fff;top:3px;left:3px;transition:left .18s;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+  .switch.on{background:var(--accent)}
+  .switch.on::after{left:21px}
+
+  .cfg-input{width:100%;border:1px solid var(--border);border-radius:12px;padding:10px 12px;font-size:13.5px;font-family:var(--sans);background:#FAF7F2;color:var(--ink);outline:none}
+  .cfg-input:focus{border-color:var(--accent)}
+
+  .privacy{margin:14px 22px 22px;padding:13px 14px;border-radius:14px;background:#FAF7F2;font-size:11.5px;color:var(--muted);line-height:1.6}
+  .toast{
+    position:absolute;left:50%;bottom:110px;transform:translateX(-50%) translateY(10px);
+    background:var(--ink);color:#fff;font-size:12.5px;padding:9px 16px;border-radius:999px;
+    opacity:0;pointer-events:none;transition:all .25s;white-space:nowrap;
+  }
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+<div class="phone" id="phone">
+
+  <div class="statusbar">
+    <span>9:41</span>
+    <span class="dots">●●●● <span style="opacity:.4">●</span></span>
+  </div>
+
+  <!-- ============ CHAT SCREEN ============ -->
+  <section class="screen active" id="screen-chat">
+    <div class="header">
+      <div>
+        <h1>心晴</h1>
+        <div class="sub">AI 情绪陪伴 · 此刻心情：<span id="mood-now" style="color:var(--accent);font-weight:600">开心</span></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span id="mode-pill" class="mode-pill">规则模式</span>
+        <span style="font-size:26px">☀️</span>
+      </div>
+    </div>
+
+    <div class="weather-chip">
+      <span style="font-size:18px">🌤️</span>
+      <span><b>今日 晴 · 21°C</b> · 预计你今晚会感到「平静」</span>
+    </div>
+
+    <div class="chat-scroll" id="chat-scroll">
+      <div class="day-sep">今天</div>
+    </div>
+
+    <div class="composer">
+      <input id="chat-input" placeholder="说说今天的心情…" maxlength="120">
+      <button class="send" id="send-btn" aria-label="发送">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4z"/></svg>
+      </button>
+    </div>
+  </section>
+
+  <!-- ============ MOOD SCREEN ============ -->
+  <section class="screen" id="screen-mood">
+    <div class="header">
+      <div>
+        <h1>心情记录</h1>
+        <div class="sub">情绪会被记录，成为你的天气</div>
+      </div>
+    </div>
+
+    <div class="seg" id="period-seg">
+      <button data-p="month" class="active">月</button>
+      <button data-p="week">周</button>
+      <button data-p="day">日</button>
+    </div>
+
+    <div class="calwrap">
+      <div class="calhead">
+        <span class="mon" id="cal-title">2026年10月</span>
+        <span class="navbtns">
+          <button id="prev-m">‹</button>
+          <button id="next-m">›</button>
+        </span>
+      </div>
+      <div class="calgrid" id="cal-grid"></div>
+    </div>
+
+    <div class="summary">
+      <div class="scard"><div class="k">本月主情绪</div><div class="v" id="sum-main">平静 <small id="sum-main-pct">42%</small></div></div>
+      <div class="scard"><div class="k">情绪平稳度</div><div class="v" id="sum-stab">78<small>%</small></div></div>
+      <div class="scard"><div class="k">记录天数</div><div class="v" id="sum-days">21<small>天</small></div></div>
+    </div>
+
+    <div class="trend">
+      <div class="tlabel">本月情绪走势</div>
+      <svg id="trend-svg" viewBox="0 0 320 64" preserveAspectRatio="none"></svg>
+    </div>
+
+    <div class="entries">
+      <div class="elabel">最近记录</div>
+      <div id="entries"></div>
+    </div>
+  </section>
+
+  <!-- ============ WEATHER SCREEN ============ -->
+  <section class="screen" id="screen-weather">
+    <div class="header">
+      <div>
+        <h1>天气 · 心情</h1>
+        <div class="sub">看懂天气，也提前读懂你的心情</div>
+      </div>
+    </div>
+
+    <div class="wcard" style="background:linear-gradient(135deg,#5B7DB1,#7FA6C9)">
+      <span class="wp">☀️</span>
+      <div class="big">21°C</div>
+      <div class="city">重庆 · 晴 · 今日</div>
+      <div class="predict">预测心情：<b>开心偏平静</b> · 今天是适合出门走走的日子</div>
+    </div>
+
+    <div class="forecast" id="forecast"></div>
+
+    <div class="insights">
+      <div class="ilabel">天气如何影响你的心情</div>
+
+      <div class="insight">
+        <span class="iw">🌧️</span>
+        <div class="itx"><div class="t">雨天</div><div class="d">你更容易感到「难过 / 疲惫」</div>
+          <div class="bar"><i style="width:68%;background:#7A9BC4"></i></div></div>
+        <span class="pct">68%</span>
+      </div>
+      <div class="insight">
+        <span class="iw">☀️</span>
+        <div class="itx"><div class="t">晴天</div><div class="d">你更容易感到「开心 / 平静」</div>
+          <div class="bar"><i style="width:74%;background:#F2A93B"></i></div></div>
+        <span class="pct">74%</span>
+      </div>
+      <div class="insight">
+        <span class="iw">☁️</span>
+        <div class="itx"><div class="t">阴天</div><div class="d">情绪平稳，多「平静」</div>
+          <div class="bar"><i style="width:52%;background:#7FB5A5"></i></div></div>
+        <span class="pct">52%</span>
+      </div>
+    </div>
+
+    <div class="care">
+      <div class="ct">明日的提前关怀</div>
+      <div class="cm">🌦️ 明天 <b>阴转小雨 · 18°C</b>。根据你的历史记录，雨天你容易有些低落。<br>建议：<b>带上伞</b>，给自己留一点独处时间，晚点回来我会陪你聊聊天。</div>
+    </div>
+  </section>
+
+  <!-- ============ SETTINGS SCREEN ============ -->
+  <section class="screen" id="screen-me">
+    <div class="header">
+      <div>
+        <h1>设置</h1>
+        <div class="sub">让心晴更懂你</div>
+      </div>
+    </div>
+
+    <div class="me">
+      <div class="avatar">🌤️</div>
+      <div>
+        <div class="nm">小晴</div>
+        <div class="ds">你的 AI 情绪陪伴 · 已陪伴 21 天</div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="slabel">AI 接口 · 自主接入</div>
+      <div class="row" style="flex-direction:column;align-items:stretch;gap:10px">
+        <div class="rtx"><div class="t">接口模式</div><div class="d">规则模式为内置演示；AI 模式实时调用你的大模型接口识别情绪并回应</div></div>
+        <div class="seg" id="mode-seg" style="margin:0;width:100%">
+          <button data-m="rule" class="active">规则模式</button>
+          <button data-m="ai">AI 模式</button>
+        </div>
+      </div>
+      <div class="row" style="flex-direction:column;align-items:stretch;gap:8px">
+        <div class="rtx"><div class="t">接口地址 Base URL</div><div class="d">OpenAI 兼容格式（/chat/completions），默认 DeepSeek</div></div>
+        <input id="cfg-base" class="cfg-input" placeholder="https://api.deepseek.com" spellcheck="false" autocomplete="off">
+        <div class="rtx"><div class="t">API Key</div><div class="d">仅保存在本机浏览器 localStorage，不上传</div></div>
+        <input id="cfg-key" class="cfg-input" type="password" placeholder="sk-..." spellcheck="false" autocomplete="off">
+        <div class="rtx"><div class="t">模型 Model</div></div>
+        <input id="cfg-model" class="cfg-input" placeholder="deepseek-chat" spellcheck="false" autocomplete="off">
+      </div>
+      <div class="row" id="cfg-test" style="cursor:pointer">
+        <span class="rem">🔌</span>
+        <div class="rtx"><div class="t">测试连接</div><div class="d" id="cfg-status">尚未测试</div></div>
+        <span style="color:var(--faint);font-size:16px">›</span>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="slabel">情绪回应预设</div>
+      <div class="row"><span class="rem">😊</span><div class="rtx"><div class="t">开心</div><div class="d">和你一起开心，放大快乐</div></div><span style="color:var(--faint);font-size:16px">›</span></div>
+      <div class="row"><span class="rem">😢</span><div class="rtx"><div class="t">难过</div><div class="d">先陪伴，再引导倾诉</div></div><span style="color:var(--faint);font-size:16px">›</span></div>
+      <div class="row"><span class="rem">😰</span><div class="rtx"><div class="t">焦虑</div><div class="d">拆解压力，稳住节奏</div></div><span style="color:var(--faint);font-size:16px">›</span></div>
+    </div>
+
+    <div class="section">
+      <div class="slabel">功能</div>
+      <div class="row"><div class="rtx"><div class="t">情绪识别</div><div class="d">聊天中自动识别并回应你的情绪</div></div><div class="switch on" data-k="detect"></div></div>
+      <div class="row"><div class="rtx"><div class="t">天气关联</div><div class="d">结合天气预测你的心情</div></div><div class="switch on" data-k="weather"></div></div>
+      <div class="row"><div class="rtx"><div class="t">每日提醒</div><div class="d">每天 21:00 提醒记录心情</div></div><div class="switch" data-k="remind"></div></div>
+    </div>
+
+    <div class="privacy">
+      🔒 情绪记录与接口配置仅保存在本机浏览器（localStorage），API Key 不会上传到任何服务器；对话仅在「AI 模式」下发送给你自己填写的接口地址。
+    </div>
+  </section>
+
+  <!-- ============ TAB BAR ============ -->
+  <nav class="tabbar">
+    <button class="tab active" data-tab="chat">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.5 8.5 0 0 1-8.5 8.5 8.5 8.5 0 0 1-3.8-.9L3 21l1.9-5.7A8.5 8.5 0 1 1 21 11.5z"/></svg>
+      对话
+    </button>
+    <button class="tab" data-tab="mood">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="3"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+      心情
+    </button>
+    <button class="tab" data-tab="weather">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+      天气
+    </button>
+    <button class="tab" data-tab="me">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3 1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+      设置
+    </button>
+  </nav>
+
+  <div class="toast" id="toast"></div>
+</div>
+
+<script>
+/* ============ 情绪模型 ============ */
+const EMOTIONS = {
+  happy:   {name:'开心', emoji:'😊', color:'#F2A93B', soft:'#FCF0DC', valence:5},
+  calm:    {name:'平静', emoji:'😌', color:'#7FB5A5', soft:'#E6F2EE', valence:4},
+  anxious: {name:'焦虑', emoji:'😰', color:'#A985C4', soft:'#F0E9F6', valence:2.5},
+  tired:   {name:'疲惫', emoji:'😪', color:'#A79E92', soft:'#EFECE8', valence:2},
+  sad:     {name:'难过', emoji:'😢', color:'#7A9BC4', soft:'#E7EEF7', valence:1.5},
+  angry:   {name:'生气', emoji:'😠', color:'#D9685F', soft:'#F9E7E5', valence:1},
+};
+const KEYWORDS = {
+  happy:  ['开心','高兴','哈哈','太好了','好棒','真棒','太棒','喜欢','幸福','爽','爱了','棒'],
+  sad:    ['难过','伤心','哭','难受','失落','委屈','想哭','不开心','低落','崩溃'],
+  angry:  ['生气','烦','气死','讨厌','愤怒','火大','不爽','气人','烦死'],
+  anxious:['焦虑','紧张','担心','害怕','慌','压力','怕','着急','不安','忐忑'],
+  tired:  ['累','疲惫','困','没力气','辛苦','熬夜','没睡好','好累'],
+  calm:   ['平静','还好','正常','一般','没事','还行','可以','安稳','淡定'],
+};
+const REPLIES = {
+  happy:  ['哈哈听你这么说，我也跟着开心起来了！☺️ 今天遇到什么好事啦？','真好呀～想听你多分享一点，快乐会翻倍的！'],
+  sad:    ['我在这里陪着你，不用一个人扛着… 愿意和我说说发生了什么吗？','抱抱你。难过的时候说出口，会好受一点。'],
+  angry:  ['这确实让人来气。先深呼吸一下，我陪你慢慢理。','我懂你的不爽。要不要先吐槽几句，发泄出来？'],
+  anxious:['别急，我们一步步来。你现在最担心的是哪一部分？','焦虑的时候，试着把大事拆成小事。我陪你一起看。'],
+  tired:  ['辛苦啦。今天先别勉强自己，休息也是正经事。','你最近是不是太拼了？今晚早点睡，好吗？'],
+  calm:   ['嗯，平静也很好。今天过得怎么样？','喜欢这样安稳的时刻。有什么想聊的吗？'],
+};
+
+function detect(text){
+  let best=null, bestN=0;
+  for(const [emo,words] of Object.entries(KEYWORDS)){
+    let n=0; for(const w of words){ if(text.includes(w)) n++; }
+    if(n>bestN){ bestN=n; best=emo; }
+  }
+  if(!best) best='calm';
+  const conf = Math.min(97, 62 + bestN*11 + (best!=='calm'?10:0));
+  return {emotion:best, confidence:conf};
+}
+
+/* ============ 月份数据（确定性生成，含天气-情绪关联） ============ */
+const WEATHERS = [
+  {w:'晴', e:'☀️'},{w:'多云', e:'⛅'},{w:'阴', e:'☁️'},{w:'小雨', e:'🌧️'},{w:'晴', e:'☀️'}
+];
+function seeded(day){ const x=Math.sin(day*127.1)*43758.5453; return x-Math.floor(x); }
+function pickWeather(day){
+  const r=seeded(day);
+  if(r<0.34) return 0; // 晴
+  if(r<0.62) return 1; // 多云
+  if(r<0.80) return 2; // 阴
+  return 3; // 小雨
+}
+function pickEmotion(day, wi){
+  const r=seeded(day*3.7);
+  let pool;
+  if(wi===0) pool=['happy','happy','calm','calm','happy','tired'];
+  else if(wi===1) pool=['calm','calm','happy','calm','tired','sad'];
+  else if(wi===2) pool=['calm','calm','sad','tired','calm','anxious'];
+  else pool=['sad','tired','anxious','sad','calm','sad'];
+  const base = pool[Math.floor(r*pool.length)];
+  // 周末稍微更开心
+  const d=new Date(now.getFullYear(), now.getMonth(), day);
+  const dow=d.getDay();
+  if((dow===0||dow===6) && r>0.6 && base!=='happy') return r>0.82?'happy':'calm';
+  return base;
+}
+const now=new Date();
+let viewY=now.getFullYear(), viewM=now.getMonth();
+let monthData={};
+let moodLog={};
+function loadMoodLog(){try{moodLog=JSON.parse(localStorage.getItem('xq_moodlog')||'{}');}catch(_){moodLog={};}}
+function saveMoodLog(){try{localStorage.setItem('xq_moodlog',JSON.stringify(moodLog));}catch(_){}}
+
+function genMonth(y,m){
+  const days=new Date(y,m+1,0).getDate();
+  const data={};
+  for(let d=1;d<=days;d++){
+    const wi=pickWeather(d);
+    data[d]={emotion:pickEmotion(d,wi), weather:wi, note:''};
+  }
+  // 最近几天加几条真实感备注
+  const notes={};
+  const today=now.getDate();
+  if(y===now.getFullYear()&&m===now.getMonth()){
+    notes[today]='今天状态还不错';
+    if(today>1) notes[today-1]='下午有些累，早睡了';
+    if(today>2) notes[today-2]='下雨天，有点低落';
+  }
+  for(const k in notes) if(data[k]) data[k].note=notes[k];
+  for(let d=1;d<=days;d++){
+    const k=y+'-'+(m+1)+'-'+d;
+    if(moodLog[k] && moodLog[k].emotion) data[d].emotion=moodLog[k].emotion;
+  }
+  return data;
+}
+function recordMood(em){
+  const d=now.getDate();
+  const key=now.getFullYear()+'-'+(now.getMonth()+1)+'-'+d;
+  moodLog[key]={emotion:em, t:Date.now()};
+  saveMoodLog();
+  if(viewY===now.getFullYear()&&viewM===now.getMonth()){
+    monthData[d].emotion=em;
+    renderSummary(); renderTrend();
+  }
+}
+function dayKey(d){return d<10?'0'+d:''+d;}
+
+/* ============ 渲染日历 ============ */
+const DOW=['日','一','二','三','四','五','六'];
+let selectedDay=null;
+
+function renderCalendar(){
+  const title=document.getElementById('cal-title');
+  title.textContent=viewY+'年'+(viewM+1)+'月';
+  monthData=genMonth(viewY,viewM);
+  const grid=document.getElementById('cal-grid');
+  grid.innerHTML='';
+  DOW.forEach(d=>{const el=document.createElement('div');el.className='dow';el.textContent=d;grid.appendChild(el);});
+  const first=new Date(viewY,viewM,1).getDay();
+  const total=new Date(viewY,viewM+1,0).getDate();
+  const today=now.getDate();
+  const isCur=(viewY===now.getFullYear()&&viewM===now.getMonth());
+  for(let i=0;i<first;i++){const b=document.createElement('div');b.className='day blank';grid.appendChild(b);}
+  for(let d=1;d<=total;d++){
+    const info=monthData[d];
+    const em=EMOTIONS[info.emotion];
+    const el=document.createElement('div');
+    el.className='day'+(isCur&&d===today?' today':'');
+    if(selectedDay&&selectedDay.y===viewY&&selectedDay.m===viewM&&selectedDay.d===d) el.classList.add('selected');
+    el.style.background=em.soft;
+    el.style.color='#5a524a';
+    el.innerHTML=`<span class="w">${WEATHERS[info.weather].e}</span><span>${d}</span>`;
+    el.onclick=()=>{ selectedDay={y:viewY,m:viewM,d:d}; renderCalendar(); renderEntries(); };
+    grid.appendChild(el);
+  }
+  renderSummary();
+  renderTrend();
+  renderEntries();
+}
+
+function renderSummary(){
+  const vals=Object.values(monthData).map(x=>EMOTIONS[x.emotion].valence);
+  const counts={};
+  Object.values(monthData).forEach(x=>{counts[x.emotion]=(counts[x.emotion]||0)+1;});
+  let main=null,mainN=0;
+  for(const [k,v] of Object.entries(counts)) if(v>mainN){mainN=v;main=k;}
+  document.getElementById('sum-main').innerHTML=EMOTIONS[main].emoji+' '+EMOTIONS[main].name+' <small id="sum-main-pct">'+Math.round(mainN/vals.length*100)+'%</small>';
+  // 平稳度：valence 方差越小越平稳
+  const mean=vals.reduce((a,b)=>a+b,0)/vals.length;
+  const vari=vals.reduce((a,b)=>a+(b-mean)**2,0)/vals.length;
+  const stab=Math.round(Math.max(40,100-vari*28));
+  document.getElementById('sum-stab').innerHTML=stab+'<small>%</small>';
+  document.getElementById('sum-days').innerHTML=vals.length+'<small>天</small>';
+}
+
+function renderTrend(){
+  const svg=document.getElementById('trend-svg');
+  const days=Object.keys(monthData).map(Number).sort((a,b)=>a-b);
+  const vals=days.map(d=>EMOTIONS[monthData[d].emotion].valence);
+  const W=320,H=64,pad=4;
+  const x=d=>pad+(d/(days.length-1))*(W-pad*2);
+  const y=v=>H-pad-(v/5)*(H-pad*2);
+  let line='', area='';
+  vals.forEach((v,i)=>{ line+=(i?'L':'M')+x(i).toFixed(1)+' '+y(v).toFixed(1); });
+  area=line+'L'+x(days.length-1).toFixed(1)+' '+(H-pad)+'L'+x(0).toFixed(1)+' '+(H-pad)+'Z';
+  const color=EMOTIONS.calm.color;
+  svg.innerHTML=
+    `<path d="${area}" fill="${color}" opacity="0.12"/>`+
+    `<path d="${line}" fill="none" stroke="${color}" stroke-width="2.5" stroke-linecap="round"/>`+
+    `<circle cx="${x(vals.length-1)}" cy="${y(vals[vals.length-1])}" r="3.5" fill="${color}"/>`;
+}
+
+function renderEntries(){
+  const box=document.getElementById('entries');
+  const days=Object.keys(monthData).map(Number).sort((a,b)=>b-a);
+  let list;
+  if(selectedDay && selectedDay.y===viewY && selectedDay.m===viewM){
+    list=[selectedDay.d];
+  } else {
+    list=days.slice(0,4);
+  }
+  box.innerHTML=list.map(d=>{
+    const info=monthData[d];
+    const em=EMOTIONS[info.emotion];
+    const w=WEATHERS[info.weather];
+    return `<div class="entry">
+      <span class="edot" style="background:${em.color}"></span>
+      <div><div class="ename">${em.emoji} ${em.name}</div>${info.note?`<div class="enote">${info.note}</div>`:''}</div>
+      <div style="text-align:right"><div class="eweather">${w.e} ${w.w}</div><div class="edate">${viewM+1}月${d}日</div></div>
+    </div>`;
+  }).join('');
+}
+
+/* ============ 天气预报 ============ */
+const FC=[['今天','☀️','21°','开心'],['明天','🌦️','18°','低落'],['周三','☁️','19°','平静'],['周四','🌧️','17°','疲惫'],['周五','☀️','22°','开心'],['周六','☀️','23°','开心'],['周日','⛅','20°','平静']];
+const FM_COLOR={开心:'#F2A93B',低落:'#7A9BC4',平静:'#7FB5A5',疲惫:'#A79E92'};
+function renderForecast(){
+  document.getElementById('forecast').innerHTML=FC.map((f,i)=>{
+    return `<div class="fday${i===0?' today':''}">
+      <div class="fd">${f[0]}</div><div class="fw">${f[1]}</div><div class="ft">${f[2]}</div>
+      <div class="fm" style="background:${FM_COLOR[f[3]]}"></div>
+    </div>`;
+  }).join('');
+}
+
+/* ============ AI 接口配置 ============ */
+const cfg={mode:'rule', baseUrl:'https://api.deepseek.com', apiKey:'', model:'deepseek-chat'};
+function loadCfg(){try{const s=JSON.parse(localStorage.getItem('xq_cfg')||'{}');Object.assign(cfg,s);}catch(_){}}
+function saveCfg(){try{localStorage.setItem('xq_cfg',JSON.stringify(cfg));}catch(_){}}
+function updateModePill(){const p=document.getElementById('mode-pill');if(p)p.textContent=cfg.mode==='ai'?'AI 模式':'规则模式';}
+function apiEndpoint(){
+  const base=(cfg.baseUrl||'https://api.deepseek.com').replace(/\/+$/,'');
+  return base.endsWith('/chat/completions')?base:base+'/chat/completions';
+}
+function bindCfg(){
+  const base=document.getElementById('cfg-base'), key=document.getElementById('cfg-key'), model=document.getElementById('cfg-model');
+  base.value=cfg.baseUrl; key.value=cfg.apiKey; model.value=cfg.model;
+  base.oninput=()=>{cfg.baseUrl=base.value.trim();saveCfg();};
+  key.oninput=()=>{cfg.apiKey=key.value.trim();saveCfg();};
+  model.oninput=()=>{cfg.model=model.value.trim();saveCfg();};
+  document.getElementById('mode-seg').querySelectorAll('button').forEach(b=>{
+    b.classList.toggle('active', b.dataset.m===cfg.mode);
+    b.onclick=()=>{
+      cfg.mode=b.dataset.m;saveCfg();
+      document.getElementById('mode-seg').querySelectorAll('button').forEach(x=>x.classList.remove('active'));
+      b.classList.add('active');
+      updateModePill();
+      document.getElementById('cfg-status').textContent = cfg.mode==='ai' ? '已切换到 AI 模式' : '已切换到规则模式';
+      showToast(cfg.mode==='ai'?'已切换到 AI 模式':'已切换到规则模式');
+    };
+  });
+  document.getElementById('cfg-test').onclick=async()=>{
+    const st=document.getElementById('cfg-status');
+    if(!cfg.apiKey){st.textContent='✗ 请先填写 API Key';showToast('请先填写 API Key');return;}
+    st.textContent='测试中…';
+    try{
+      const res=await fetch(apiEndpoint(),{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+cfg.apiKey},body:JSON.stringify({model:cfg.model||'deepseek-chat',messages:[{role:'user',content:'你好'}],max_tokens:20})});
+      if(!res.ok){let emsg='HTTP '+res.status;try{const e=await res.json();emsg=(e.error&&e.error.message)?e.error.message:emsg;}catch(_){}throw new Error(emsg);}
+      const d=await res.json();
+      const m=d.model||(d.choices&&d.choices[0]&&d.choices[0].model)||'ok';
+      st.textContent='✓ 连接成功（'+m+'）';
+      showToast('接口连接成功');
+    }catch(e){st.textContent='✗ '+e.message;showToast('接口失败：'+e.message);}
+  };
+}
+
+/* ============ 聊天 ============ */
+let currentEmotion='happy';
+let aiBusy=false;
+let history=[];
+function pushHistory(role,content){history.push({role,content});if(history.length>20)history=history.slice(-20);}
+function buildMessages(){
+  const sys='你是「心晴」，一个温暖的情绪陪伴 AI。你的任务：1) 识别用户消息中的情绪，只能是 happy/calm/anxious/tired/sad/angry 之一；2) 用与用户情绪相匹配的语气共情地回应，简洁自然，1~3 句话；3) 只输出一个 JSON 对象，格式严格为 {"emotion":"happy","confidence":0.9,"reply":"..."}，不要输出任何 JSON 之外的文字。emotion 取值必须是 happy、calm、anxious、tired、sad、angry 之一。';
+  return [{role:'system',content:sys}, ...history.slice(-10)];
+}
+function parseAI(content){
+  let em='calm',conf=0.8,reply=(content||'').trim();
+  const m=(content||'').match(/\{[\s\S]*\}/);
+  if(m){
+    try{
+      const o=JSON.parse(m[0]);
+      if(EMOTIONS[o.emotion]) em=o.emotion;
+      if(typeof o.confidence==='number') conf=Math.max(0,Math.min(1,o.confidence));
+      if(typeof o.reply==='string'&&o.reply.trim()) reply=o.reply.trim();
+    }catch(_){}
+  }
+  return {emotion:em, confidence:conf, reply:reply};
+}
+const scroll=document.getElementById('chat-scroll');
+function scrollBottom(){scroll.scrollTop=scroll.scrollHeight;}
+function addBubble(html,cls){const el=document.createElement('div');el.className='msg '+cls;el.innerHTML=html;scroll.appendChild(el);scrollBottom();return el;}
+function addEmotag(em,conf){const el=document.createElement('div');el.className='emotag';el.innerHTML=`<span class="dot" style="background:${EMOTIONS[em].color}"></span>识别到 ${EMOTIONS[em].name} · ${conf}%`;scroll.appendChild(el);scrollBottom();}
+function setMood(em){currentEmotion=em;document.getElementById('mood-now').textContent=EMOTIONS[em].name;}
+
+function showTyping(){
+  const el=document.createElement('div');el.className='typing';
+  el.innerHTML='<span></span><span></span><span></span>';scroll.appendChild(el);scrollBottom();return el;
+}
+function respond(em){
+  const t=showTyping();
+  const pool=REPLIES[em];
+  const txt=pool[Math.floor(Math.random()*pool.length)];
+  setTimeout(()=>{t.remove();addBubble(txt,'ai');pushHistory('assistant',txt);},700+Math.random()*500);
+}
+async function aiRespond(){
+  if(!cfg.apiKey){
+    addBubble('还没有配置 API Key 哦。去「设置 → AI 接口」填一下就能用真 AI 啦，或者先切回规则模式。','ai');
+    showToast('请先配置 API Key'); return;
+  }
+  aiBusy=true;
+  const t=showTyping();
+  try{
+    const res=await fetch(apiEndpoint(),{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+cfg.apiKey},
+      body:JSON.stringify({model:cfg.model||'deepseek-chat',messages:buildMessages(),temperature:0.8,max_tokens:300})
+    });
+    if(!res.ok){
+      let emsg='HTTP '+res.status;
+      try{const e=await res.json();emsg=(e.error&&e.error.message)?e.error.message:emsg;}catch(_){}
+      throw new Error(emsg);
+    }
+    const data=await res.json();
+    const content=(data.choices&&data.choices[0]&&data.choices[0].message&&data.choices[0].message.content)||'';
+    t.remove();
+    const p=parseAI(content);
+    addBubble(p.reply.replace(/</g,'&lt;'),'ai');
+    pushHistory('assistant',p.reply);
+    setMood(p.emotion);
+    addEmotag(p.emotion,Math.round((p.confidence||0.8)*100));
+    recordMood(p.emotion);
+  }catch(err){
+    t.remove();
+    addBubble('接口调用失败：'+String(err.message||err)+'\n可在「设置 → AI 接口」检查配置，或切回规则模式。','ai');
+    showToast('接口失败：'+err.message);
+  }finally{ aiBusy=false; }
+}
+function send(){
+  const inp=document.getElementById('chat-input');
+  const text=inp.value.trim();
+  if(!text||aiBusy) return;
+  inp.value='';
+  addBubble(text.replace(/</g,'&lt;'),'user');
+  pushHistory('user',text);
+  if(cfg.mode==='ai'){ aiRespond(); }
+  else{
+    const r=detect(text);
+    setMood(r.emotion);
+    addEmotag(r.emotion,r.confidence);
+    recordMood(r.emotion);
+    respond(r.emotion);
+  }
+}
+
+/* ============ 事件绑定 ============ */
+document.getElementById('send-btn').onclick=send;
+document.getElementById('chat-input').addEventListener('keydown',e=>{if(e.key==='Enter')send();});
+
+document.querySelectorAll('.tab').forEach(t=>{
+  t.onclick=()=>{
+    document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+    document.querySelectorAll('.screen').forEach(x=>x.classList.remove('active'));
+    t.classList.add('active');
+    document.getElementById('screen-'+t.dataset.tab).classList.add('active');
+  };
+});
+document.getElementById('prev-m').onclick=()=>{viewM--;if(viewM<0){viewM=11;viewY--;}renderCalendar();};
+document.getElementById('next-m').onclick=()=>{viewM++;if(viewM>11){viewM=0;viewY++;}renderCalendar();};
+document.getElementById('period-seg').querySelectorAll('button').forEach(b=>{
+  b.onclick=()=>{
+    document.getElementById('period-seg').querySelectorAll('button').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active');
+    showToast('「'+b.textContent+'」视图将在正式版呈现');
+  };
+});
+document.querySelectorAll('.switch').forEach(s=>{
+  s.onclick=()=>{s.classList.toggle('on');};
+});
+
+function showToast(t){
+  const el=document.getElementById('toast');
+  el.textContent=t;el.classList.add('show');
+  clearTimeout(showToast._t);
+  showToast._t=setTimeout(()=>el.classList.remove('show'),1600);
+}
+
+/* ============ 初始引导对话 ============ */
+function seed(){
+  addBubble('早上好呀，今天天气不错 ☀️ 感觉怎么样？','ai');
+  pushHistory('assistant','早上好呀，今天天气不错，感觉怎么样？');
+  setTimeout(()=>{
+    addBubble('今天还挺开心的，天气好，心情也好','user');
+    pushHistory('user','今天还挺开心的，天气好，心情也好');
+    addEmotag('happy',92);
+    setMood('happy');
+    respond('happy');
+  },500);
+}
+
+/* ============ 启动 ============ */
+loadMoodLog();
+loadCfg();
+bindCfg();
+updateModePill();
+renderCalendar();
+renderForecast();
+seed();
+</script>
+</body>
+</html>
