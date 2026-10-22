@@ -19,7 +19,7 @@
   }
   *{box-sizing:border-box;margin:0;padding:0}
   html,body{height:100%}
-  body{background:var(--bg);font-family:var(--sans);color:var(--ink);-webkit-font-smoothing:antialiased}
+  body{background:var(--bg);font-family:var(--sans);color:var(--ink);-webkit-font-smoothing:antialiased;transition:background 1s ease}
 
   .app{display:flex;height:100vh;overflow:hidden}
 
@@ -291,7 +291,7 @@
     <section class="screen active chat-screen" id="screen-chat">
       <div class="chat-head">
         <div class="container-narrow head-row">
-          <div class="mood-line">小晴 · 此刻心情 <b id="mood-now">开心</b></div>
+          <div class="mood-line"><span id="ai-name">小晴</span> · 此刻心情 <b id="mood-now">开心</b></div>
           <span id="mode-pill" class="mode-pill">规则模式</span>
         </div>
         <div class="container-narrow">
@@ -424,7 +424,7 @@
         <div class="me">
           <div class="avatar">🌤️</div>
           <div>
-            <div class="nm">小晴</div>
+            <div class="nm" id="ai-name-settings">小晴</div>
             <div class="ds">你的 AI 情绪陪伴 · 规则模式免费可用，接入自己的 API 升级为真 AI</div>
           </div>
         </div>
@@ -450,6 +450,28 @@
             <span class="rem">🔌</span>
             <div class="rtx"><div class="t">测试连接</div><div class="d" id="cfg-status">尚未测试</div></div>
             <span style="color:var(--faint);font-size:16px">›</span>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="slabel">聊天 AI 角色</div>
+          <div class="row" style="flex-direction:column;align-items:stretch;gap:8px">
+            <div class="rtx"><div class="t">AI 名称</div><div class="d">给陪伴你的 AI 起个名字，会显示在对话页</div></div>
+            <input id="cfg-ainame" class="cfg-input" placeholder="小晴" maxlength="12" spellcheck="false">
+          </div>
+          <div class="row" style="flex-direction:column;align-items:stretch;gap:10px">
+            <div class="rtx"><div class="t">角色性格</div><div class="d">决定 AI 用什么样的语气陪伴你（仅 AI 模式生效）</div></div>
+            <div class="seg" id="persona-seg" style="width:100%">
+              <button data-p="warm" class="active">温柔陪伴</button>
+              <button data-p="funny">幽默朋友</button>
+              <button data-p="sister">知心姐姐</button>
+              <button data-p="pro">理性顾问</button>
+              <button data-p="custom">自定义</button>
+            </div>
+          </div>
+          <div class="row" id="custom-prompt-row" style="flex-direction:column;align-items:stretch;gap:8px;display:none">
+            <div class="rtx"><div class="t">自定义角色设定</div><div class="d">用一句话描述你想要的角色，例如「你是一位懂占星的朋友，爱聊星座」</div></div>
+            <textarea id="cfg-customprompt" class="cfg-input" rows="3" placeholder="你是一位……" style="resize:vertical;font-family:var(--sans);line-height:1.6"></textarea>
           </div>
         </div>
 
@@ -510,12 +532,12 @@
 <script>
 /* ============ 情绪模型 ============ */
 const EMOTIONS = {
-  happy:   {name:'开心', emoji:'😊', color:'#F2A93B', soft:'#FCF0DC', valence:5},
-  calm:    {name:'平静', emoji:'😌', color:'#7FB5A5', soft:'#E6F2EE', valence:4},
-  anxious: {name:'焦虑', emoji:'😰', color:'#A985C4', soft:'#F0E9F6', valence:2.5},
-  tired:   {name:'疲惫', emoji:'😪', color:'#A79E92', soft:'#EFECE8', valence:2},
-  sad:     {name:'难过', emoji:'😢', color:'#7A9BC4', soft:'#E7EEF7', valence:1.5},
-  angry:   {name:'生气', emoji:'😠', color:'#D9685F', soft:'#F9E7E5', valence:1},
+  happy:   {name:'开心', emoji:'😊', color:'#F2A93B', soft:'#FCF0DC', valence:5, grad:'linear-gradient(135deg,#FDF3E2 0%,#FBE4CC 100%)'},
+  calm:    {name:'平静', emoji:'😌', color:'#7FB5A5', soft:'#E6F2EE', valence:4, grad:'linear-gradient(135deg,#EAF3EF 0%,#DCEBE5 100%)'},
+  anxious: {name:'焦虑', emoji:'😰', color:'#A985C4', soft:'#F0E9F6', valence:2.5, grad:'linear-gradient(135deg,#F2EDF9 0%,#E5DBF1 100%)'},
+  tired:   {name:'疲惫', emoji:'😪', color:'#A79E92', soft:'#EFECE8', valence:2, grad:'linear-gradient(135deg,#F1EEE9 0%,#E6E0D7 100%)'},
+  sad:     {name:'难过', emoji:'😢', color:'#7A9BC4', soft:'#E7EEF7', valence:1.5, grad:'linear-gradient(135deg,#EAF0F8 0%,#DCE6F2 100%)'},
+  angry:   {name:'生气', emoji:'😠', color:'#D9685F', soft:'#F9E7E5', valence:1, grad:'linear-gradient(135deg,#FBEAE7 0%,#F4D9D3 100%)'},
 };
 const KEYWORDS = {
   happy:  ['开心','高兴','哈哈','太好了','好棒','真棒','太棒','喜欢','幸福','爽','爱了','棒'],
@@ -707,10 +729,11 @@ function renderForecast(){
 }
 
 /* ============ AI 接口配置 ============ */
-const cfg={mode:'rule', baseUrl:'https://api.deepseek.com', apiKey:'', model:'deepseek-chat'};
+const cfg={mode:'rule', baseUrl:'https://api.deepseek.com', apiKey:'', model:'deepseek-chat', aiName:'小晴', aiPersona:'warm', aiCustomPrompt:''};
 function loadCfg(){try{const s=JSON.parse(localStorage.getItem('xq_cfg')||'{}');Object.assign(cfg,s);}catch(_){}}
 function saveCfg(){try{localStorage.setItem('xq_cfg',JSON.stringify(cfg));}catch(_){}}
 function updateModePill(){const p=document.getElementById('mode-pill');if(p)p.textContent=cfg.mode==='ai'?'AI 模式':'规则模式';}
+function updateAiName(){const n=cfg.aiName||'小晴';const a=document.getElementById('ai-name');if(a)a.textContent=n;const b=document.getElementById('ai-name-settings');if(b)b.textContent=n;}
 function apiEndpoint(){
   const base=(cfg.baseUrl||'https://api.deepseek.com').replace(/\/+$/,'');
   return base.endsWith('/chat/completions')?base:base+'/chat/completions';
@@ -721,6 +744,21 @@ function bindCfg(){
   base.oninput=()=>{cfg.baseUrl=base.value.trim();saveCfg();};
   key.oninput=()=>{cfg.apiKey=key.value.trim();saveCfg();};
   model.oninput=()=>{cfg.model=model.value.trim();saveCfg();};
+  const ainame=document.getElementById('cfg-ainame'), customprompt=document.getElementById('cfg-customprompt');
+  ainame.value=cfg.aiName; customprompt.value=cfg.aiCustomPrompt;
+  ainame.oninput=()=>{cfg.aiName=ainame.value.trim()||'小晴';saveCfg();updateAiName();};
+  customprompt.oninput=()=>{cfg.aiCustomPrompt=customprompt.value;saveCfg();};
+  document.getElementById('persona-seg').querySelectorAll('button').forEach(b=>{
+    b.classList.toggle('active', b.dataset.p===cfg.aiPersona);
+    b.onclick=()=>{
+      cfg.aiPersona=b.dataset.p;saveCfg();
+      document.getElementById('persona-seg').querySelectorAll('button').forEach(x=>x.classList.remove('active'));
+      b.classList.add('active');
+      document.getElementById('custom-prompt-row').style.display = b.dataset.p==='custom'?'flex':'none';
+    };
+  });
+  document.getElementById('custom-prompt-row').style.display = cfg.aiPersona==='custom'?'flex':'none';
+  updateAiName();
   document.getElementById('mode-seg').querySelectorAll('button').forEach(b=>{
     b.classList.toggle('active', b.dataset.m===cfg.mode);
     b.onclick=()=>{
@@ -823,9 +861,25 @@ let currentEmotion='happy';
 let aiBusy=false;
 let history=[];
 function pushHistory(role,content){history.push({role,content});if(history.length>20)history=history.slice(-20);}
+const PERSONAS={
+  warm:  {name:'温柔陪伴', prompt:'你是「{name}」，一个温暖、善解人意的情绪陪伴者。用温柔、共情的语气回应，让对方感到被理解、被支持。'},
+  funny: {name:'幽默朋友', prompt:'你是「{name}」，一个幽默风趣、轻松的朋友。用轻松、俏皮的语气回应，适当开点无伤大雅的玩笑，帮对方放松心情。'},
+  sister:{name:'知心姐姐', prompt:'你是「{name}」，一个温柔体贴、耐心倾听的知心姐姐。多倾听、多共情，用安抚、鼓励的语气回应。'},
+  pro:   {name:'理性顾问', prompt:'你是「{name}」，一个冷静、理性的顾问。用客观、条理清晰的方式帮对方分析问题，给出务实的建议，同时不失温度。'},
+};
+function buildSystem(){
+  const name=cfg.aiName||'小晴';
+  const key=cfg.aiPersona||'warm';
+  let flavor;
+  if(key==='custom' && (cfg.aiCustomPrompt||'').trim()){
+    flavor=cfg.aiCustomPrompt.trim();
+  }else{
+    flavor=(PERSONAS[key]||PERSONAS.warm).prompt.split('{name}').join(name);
+  }
+  return flavor+'\n\n你的任务（必须遵守）：1) 识别用户消息中的情绪，只能是 happy/calm/anxious/tired/sad/angry 之一；2) 用与用户情绪相匹配的语气共情地回应，简洁自然，1~3 句话；3) 只输出一个 JSON 对象，格式严格为 {"emotion":"happy","confidence":0.9,"reply":"..."}，不要输出任何 JSON 之外的文字。emotion 取值必须是 happy、calm、anxious、tired、sad、angry 之一。';
+}
 function buildMessages(){
-  const sys='你是「心晴」，一个温暖的情绪陪伴 AI。你的任务：1) 识别用户消息中的情绪，只能是 happy/calm/anxious/tired/sad/angry 之一；2) 用与用户情绪相匹配的语气共情地回应，简洁自然，1~3 句话；3) 只输出一个 JSON 对象，格式严格为 {"emotion":"happy","confidence":0.9,"reply":"..."}，不要输出任何 JSON 之外的文字。emotion 取值必须是 happy、calm、anxious、tired、sad、angry 之一。';
-  return [{role:'system',content:sys}, ...history.slice(-10)];
+  return [{role:'system',content:buildSystem()}, ...history.slice(-10)];
 }
 function parseAI(content){
   let em='calm',conf=0.8,reply=(content||'').trim();
@@ -845,7 +899,7 @@ const scroll=document.getElementById('chat-scroll');
 function scrollBottom(){scroll.scrollTop=scroll.scrollHeight;}
 function addBubble(html,cls){const el=document.createElement('div');el.className='msg '+cls;el.innerHTML=html;scroll.appendChild(el);scrollBottom();return el;}
 function addEmotag(em,conf){const el=document.createElement('div');el.className='emotag';el.innerHTML=`<span class="dot" style="background:${EMOTIONS[em].color}"></span>识别到 ${EMOTIONS[em].name} · ${conf}%`;scroll.appendChild(el);scrollBottom();}
-function setMood(em){currentEmotion=em;document.getElementById('mood-now').textContent=EMOTIONS[em].name;}
+function setMood(em){currentEmotion=em;document.getElementById('mood-now').textContent=EMOTIONS[em].name;const g=(EMOTIONS[em]||EMOTIONS.calm).grad;document.body.style.background=g;}
 
 function showTyping(){
   const el=document.createElement('div');el.className='typing';
@@ -958,6 +1012,7 @@ loadMoodLog();
 loadCfg();
 bindCfg();
 updateModePill();
+document.body.style.background=EMOTIONS.happy.grad;
 renderCalendar();
 renderForecast();
 initOnboard();
