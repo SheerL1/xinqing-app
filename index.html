@@ -176,6 +176,13 @@
   .care{padding:20px;border-radius:18px;background:#F0F4F2;border:1px solid #DDE8E3}
   .care .ct{font-size:12px;color:#5B7568;font-weight:600;letter-spacing:1px}
   .care .cm{font-size:14.5px;margin-top:9px;line-height:1.7}
+  .rec-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px}
+  .rec-card{background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:20px}
+  .rec-head{display:flex;align-items:center;gap:8px;margin-bottom:12px}
+  .rec-ico{font-size:21px}
+  .rec-title{font-size:13px;font-weight:600;color:var(--muted)}
+  .rec-main{font-size:16px;font-weight:600;line-height:1.5}
+  .rec-tip{font-size:12.5px;color:var(--muted);margin-top:7px;line-height:1.55}
 
   /* ============ SETTINGS ============ */
   .me{display:flex;align-items:center;gap:16px;padding:20px;border:1px solid var(--border);border-radius:18px;background:var(--surface);margin-bottom:20px}
@@ -244,7 +251,7 @@
     .chat-head{padding:18px 16px 0}
     .chat-scroll{padding:18px 16px 14px}
     .chat-composer{padding:14px 16px 20px}
-    .mood-grid,.weather-grid{grid-template-columns:1fr}
+    .mood-grid,.weather-grid,.rec-grid{grid-template-columns:1fr}
     .insights{grid-template-columns:1fr}
     .forecast{grid-template-columns:repeat(4,1fr);gap:6px}
   }
@@ -378,6 +385,19 @@
             <div class="predict">预测心情：<b>开心偏平静</b> · 今天是适合出门走走的日子</div>
           </div>
           <div class="forecast" id="forecast"></div>
+        </div>
+
+        <div class="rec-grid">
+          <div class="rec-card">
+            <div class="rec-head"><span class="rec-ico">🏃</span><span class="rec-title">运动推荐</span></div>
+            <div class="rec-main" id="rec-exercise">—</div>
+            <div class="rec-tip" id="rec-exercise-tip">—</div>
+          </div>
+          <div class="rec-card">
+            <div class="rec-head"><span class="rec-ico">👕</span><span class="rec-title">衣着推荐</span></div>
+            <div class="rec-main" id="rec-clothing">—</div>
+            <div class="rec-tip" id="rec-clothing-tip">—</div>
+          </div>
         </div>
 
         <div class="insights">
@@ -729,6 +749,42 @@ function renderForecast(){
   }).join('');
 }
 
+/* ============ 今日推荐（运动 + 衣着，基于情绪 + 天气） ============ */
+const TODAY_WEATHER={type:'晴', temp:21};
+const EXERCISE={
+  happy:  {out:'户外跑步 / 骑行 / 球类', inn:'室内有氧 / 舞蹈 / 健身操', tip:'好心情遇上好天气，尽情释放活力'},
+  calm:   {out:'慢跑 / 散步 / 骑行', inn:'瑜伽 / 拉伸 / 游泳', tip:'保持节奏，轻量运动就好'},
+  anxious:{out:'快走 / 慢跑（释放压力）', inn:'瑜伽 / 室内单车 / 冥想拉伸', tip:'动起来能明显缓解焦虑'},
+  tired:  {out:'轻量散步（别勉强）', inn:'舒缓拉伸 / 简单瑜伽', tip:'今天以恢复为主，避免高强度'},
+  sad:    {out:'晒太阳散步 / 轻快走', inn:'轻松有氧 / 舞蹈（提振情绪）', tip:'动一动，心情会轻快起来'},
+  angry:  {out:'快跑 / 高强度有氧', inn:'室内间歇训练 / 拳击操', tip:'把情绪化作汗水释放掉'},
+};
+const CLOTHING={
+  '晴':{base:'透气清爽', layers:[[15,'薄外套'],[24,'长袖薄款'],[99,'短袖/薄衫']]},
+  '多云':{base:'备件薄外套', layers:[[15,'风衣/夹克'],[24,'长袖+薄外套'],[99,'长袖']]},
+  '阴':{base:'长袖为主', layers:[[15,'夹克/卫衣'],[24,'长袖+外套'],[99,'长袖']]},
+  '小雨':{base:'带伞 + 防泼水外套', layers:[[15,'防水外套+厚衣'],[24,'防水薄外套'],[99,'防泼水外套']]},
+};
+const CLOTHING_MOOD={
+  happy:'穿点明亮的颜色，精神些', calm:'简约舒适即可', anxious:'选宽松舒适的，别勒太紧',
+  tired:'舒服第一，怎么舒服怎么穿', sad:'柔软亲肤的面料，给自己点温暖', angry:'透气方便活动的，出出汗',
+};
+function getTempLayer(type,temp){
+  const layers=(CLOTHING[type]||CLOTHING['晴']).layers;
+  for(const l of layers){ if(temp<=l[0]) return l[1]; }
+  return layers[layers.length-1][1];
+}
+function renderRecommendations(emotion){
+  const ex=EXERCISE[emotion]||EXERCISE.calm;
+  const rainy=(TODAY_WEATHER.type==='小雨');
+  const c=CLOTHING[TODAY_WEATHER.type]||CLOTHING['晴'];
+  const layer=getTempLayer(TODAY_WEATHER.type,TODAY_WEATHER.temp);
+  const el1=document.getElementById('rec-exercise'); if(el1) el1.textContent=(rainy?'（雨天 · 室内）':'')+ex[rainy?'inn':'out'];
+  const el2=document.getElementById('rec-exercise-tip'); if(el2) el2.textContent=ex.tip;
+  const el3=document.getElementById('rec-clothing'); if(el3) el3.textContent=c.base+' · '+layer+' · '+TODAY_WEATHER.temp+'°C';
+  const el4=document.getElementById('rec-clothing-tip'); if(el4) el4.textContent=CLOTHING_MOOD[emotion]||CLOTHING_MOOD.calm;
+}
+
 /* ============ AI 接口配置 ============ */
 const cfg={mode:'ai', baseUrl:'https://api.deepseek.com', apiKey:'', model:'deepseek-flash', aiName:'小晴', aiPersona:'warm', aiCustomPrompt:''};
 const SHARED_BACKEND='https://1503807332-0lay5cky55.ap-guangzhou.tencentscf.com';
@@ -911,7 +967,7 @@ const scroll=document.getElementById('chat-scroll');
 function scrollBottom(){scroll.scrollTop=scroll.scrollHeight;}
 function addBubble(html,cls){const el=document.createElement('div');el.className='msg '+cls;el.innerHTML=html;scroll.appendChild(el);scrollBottom();return el;}
 function addEmotag(em,conf){const el=document.createElement('div');el.className='emotag';el.innerHTML=`<span class="dot" style="background:${EMOTIONS[em].color}"></span>识别到 ${EMOTIONS[em].name} · ${conf}%`;scroll.appendChild(el);scrollBottom();}
-function setMood(em){currentEmotion=em;document.getElementById('mood-now').textContent=EMOTIONS[em].name;const g=(EMOTIONS[em]||EMOTIONS.calm).grad;document.body.style.background=g;}
+function setMood(em){currentEmotion=em;document.getElementById('mood-now').textContent=EMOTIONS[em].name;const g=(EMOTIONS[em]||EMOTIONS.calm).grad;document.body.style.background=g;renderRecommendations(em);}
 
 function showTyping(){
   const el=document.createElement('div');el.className='typing';
@@ -1030,6 +1086,7 @@ updateModePill();
 document.body.style.background=EMOTIONS.happy.grad;
 renderCalendar();
 renderForecast();
+renderRecommendations('happy');
 initOnboard();
 seed();
 </script>
