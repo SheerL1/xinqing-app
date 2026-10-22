@@ -216,6 +216,8 @@
   .provider:hover{border-color:#E0C9B8}
   .provider.active{border-color:var(--accent);background:var(--accent-soft)}
   .p-emoji{font-size:22px}
+  .p-logo{width:24px;height:24px;display:block;margin:0 auto}
+  .p-fb{width:24px;height:24px;border-radius:7px;display:flex;align-items:center;justify-content:center;margin:0 auto;font-size:14px;color:#fff;font-weight:600;font-family:var(--sans)}
   .p-name{font-size:13px;font-weight:600;margin-top:4px}
   .p-desc{font-size:10.5px;color:var(--muted);margin-top:2px}
   .m-field{margin-bottom:11px}
@@ -747,17 +749,23 @@ function bindCfg(){
 
 /* ============ 接入 AI 引导 ============ */
 const PROVIDERS=[
-  {id:'deepseek', name:'DeepSeek', emoji:'🐋', base:'https://api.deepseek.com', model:'deepseek-chat', desc:'国产性价比'},
-  {id:'openai', name:'OpenAI', emoji:'🤖', base:'https://api.openai.com/v1', model:'gpt-4o-mini', desc:'GPT 系列'},
-  {id:'moonshot', name:'Kimi 月之暗面', emoji:'🌙', base:'https://api.moonshot.cn/v1', model:'moonshot-v1-8k', desc:'长文本'},
-  {id:'qwen', name:'通义千问', emoji:'☁️', base:'https://dashscope.aliyuncs.com/compatible-mode/v1', model:'qwen-plus', desc:'阿里'},
-  {id:'glm', name:'智谱 GLM', emoji:'💠', base:'https://open.bigmodel.cn/api/paas/v4', model:'glm-4-flash', desc:'清华系'},
-  {id:'custom', name:'自定义', emoji:'⚙️', base:'', model:'', desc:'OpenAI 兼容'},
+  {id:'deepseek', name:'DeepSeek', logo:'https://cdn.simpleicons.org/deepseek', fallback:'🐋', fbColor:'#5786FE', base:'https://api.deepseek.com', model:'deepseek-chat', desc:'国产性价比'},
+  {id:'openai', name:'OpenAI', logo:'https://cdn.jsdelivr.net/npm/simple-icons@13/icons/openai.svg', fallback:'🤖', fbColor:'#10A37F', base:'https://api.openai.com/v1', model:'gpt-4o-mini', desc:'GPT 系列'},
+  {id:'moonshot', name:'Kimi 月之暗面', logo:'https://cdn.simpleicons.org/kimi', fallback:'🌙', fbColor:'#000000', base:'https://api.moonshot.cn/v1', model:'moonshot-v1-8k', desc:'长文本'},
+  {id:'qwen', name:'通义千问', logo:'https://cdn.simpleicons.org/qwen', fallback:'☁️', fbColor:'#6950EF', base:'https://dashscope.aliyuncs.com/compatible-mode/v1', model:'qwen-plus', desc:'阿里'},
+  {id:'glm', name:'智谱 GLM', logo:'', fallback:'智', fbColor:'#3B6BFF', base:'https://open.bigmodel.cn/api/paas/v4', model:'glm-4-flash', desc:'清华系'},
+  {id:'custom', name:'自定义', logo:'', fallback:'⚙️', fbColor:'#8A8178', base:'', model:'', desc:'OpenAI 兼容'},
 ];
 let selectedProvider='deepseek';
+function pIcon(p){
+  if(p.logo){
+    return `<img class="p-logo" src="${p.logo}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><span class="p-fb" style="background:${p.fbColor};display:none">${p.fallback}</span>`;
+  }
+  return `<span class="p-fb" style="background:${p.fbColor}">${p.fallback}</span>`;
+}
 function renderProviders(){
   const box=document.getElementById('providers');
-  box.innerHTML=PROVIDERS.map(p=>`<div class="provider${p.id===selectedProvider?' active':''}" data-p="${p.id}"><span class="p-emoji">${p.emoji}</span><div class="p-name">${p.name}</div><div class="p-desc">${p.desc}</div></div>`).join('');
+  box.innerHTML=PROVIDERS.map(p=>`<div class="provider${p.id===selectedProvider?' active':''}" data-p="${p.id}">${pIcon(p)}<div class="p-name">${p.name}</div><div class="p-desc">${p.desc}</div></div>`).join('');
   box.querySelectorAll('.provider').forEach(el=>{
     el.onclick=()=>{
       selectedProvider=el.dataset.p;
