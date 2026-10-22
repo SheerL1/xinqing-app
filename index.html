@@ -444,7 +444,7 @@
             <div class="rtx"><div class="t">API Key</div><div class="d">仅保存在你自己的浏览器 localStorage，不上传任何服务器</div></div>
             <input id="cfg-key" class="cfg-input" type="password" placeholder="sk-..." spellcheck="false" autocomplete="off">
             <div class="rtx"><div class="t">模型 Model</div></div>
-            <input id="cfg-model" class="cfg-input" placeholder="deepseek-chat" spellcheck="false" autocomplete="off">
+            <input id="cfg-model" class="cfg-input" placeholder="deepseek-flash" spellcheck="false" autocomplete="off">
           </div>
           <div class="row" id="cfg-test" style="cursor:pointer">
             <span class="rem">🔌</span>
@@ -519,7 +519,7 @@
     </div>
     <div class="m-field">
       <label>模型 Model（自动匹配，可改）</label>
-      <input id="onboard-model" spellcheck="false" autocomplete="off" placeholder="deepseek-chat">
+      <input id="onboard-model" spellcheck="false" autocomplete="off" placeholder="deepseek-flash">
     </div>
     <div class="m-actions">
       <button id="onboard-save" class="btn-primary">保存并开始</button>
@@ -729,7 +729,7 @@ function renderForecast(){
 }
 
 /* ============ AI 接口配置 ============ */
-const cfg={mode:'rule', baseUrl:'https://api.deepseek.com', apiKey:'', model:'deepseek-chat', aiName:'小晴', aiPersona:'warm', aiCustomPrompt:''};
+const cfg={mode:'rule', baseUrl:'https://api.deepseek.com', apiKey:'', model:'deepseek-flash', aiName:'小晴', aiPersona:'warm', aiCustomPrompt:''};
 function loadCfg(){try{const s=JSON.parse(localStorage.getItem('xq_cfg')||'{}');Object.assign(cfg,s);}catch(_){}}
 function saveCfg(){try{localStorage.setItem('xq_cfg',JSON.stringify(cfg));}catch(_){}}
 function updateModePill(){const p=document.getElementById('mode-pill');if(p)p.textContent=cfg.mode==='ai'?'AI 模式':'规则模式';}
@@ -775,7 +775,7 @@ function bindCfg(){
     if(!cfg.apiKey){st.textContent='✗ 请先填写 API Key';showToast('请先填写 API Key');return;}
     st.textContent='测试中…';
     try{
-      const res=await fetch(apiEndpoint(),{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+cfg.apiKey},body:JSON.stringify({model:cfg.model||'deepseek-chat',messages:[{role:'user',content:'你好'}],max_tokens:20})});
+      const res=await fetch(apiEndpoint(),{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+cfg.apiKey},body:JSON.stringify({model:cfg.model||'deepseek-flash',messages:[{role:'user',content:'你好'}],max_tokens:20})});
       if(!res.ok){let emsg='HTTP '+res.status;try{const e=await res.json();emsg=(e.error&&e.error.message)?e.error.message:emsg;}catch(_){}throw new Error(emsg);}
       const d=await res.json();
       const m=d.model||(d.choices&&d.choices[0]&&d.choices[0].model)||'ok';
@@ -787,7 +787,7 @@ function bindCfg(){
 
 /* ============ 接入 AI 引导 ============ */
 const PROVIDERS=[
-  {id:'deepseek', name:'DeepSeek', logo:'https://cdn.simpleicons.org/deepseek', fallback:'🐋', fbColor:'#5786FE', base:'https://api.deepseek.com', model:'deepseek-chat', desc:'国产性价比'},
+  {id:'deepseek', name:'DeepSeek', logo:'https://cdn.simpleicons.org/deepseek', fallback:'🐋', fbColor:'#5786FE', base:'https://api.deepseek.com', model:'deepseek-flash', desc:'国产性价比'},
   {id:'openai', name:'OpenAI', logo:'https://cdn.jsdelivr.net/npm/simple-icons@13/icons/openai.svg', fallback:'🤖', fbColor:'#10A37F', base:'https://api.openai.com/v1', model:'gpt-4o-mini', desc:'GPT 系列'},
   {id:'moonshot', name:'Kimi 月之暗面', logo:'https://cdn.simpleicons.org/kimi', fallback:'🌙', fbColor:'#000000', base:'https://api.moonshot.cn/v1', model:'moonshot-v1-8k', desc:'长文本'},
   {id:'qwen', name:'通义千问', logo:'https://cdn.simpleicons.org/qwen', fallback:'☁️', fbColor:'#6950EF', base:'https://dashscope.aliyuncs.com/compatible-mode/v1', model:'qwen-plus', desc:'阿里'},
@@ -837,7 +837,7 @@ function initOnboard(){
     if(!key){ showToast('请填写 API Key，或点「跳过」'); return; }
     cfg.baseUrl=base||'https://api.deepseek.com';
     cfg.apiKey=key;
-    cfg.model=model||'deepseek-chat';
+    cfg.model=model||'deepseek-flash';
     cfg.mode='ai';
     saveCfg();
     document.getElementById('cfg-base').value=cfg.baseUrl;
@@ -922,7 +922,7 @@ async function aiRespond(){
     const res=await fetch(apiEndpoint(),{
       method:'POST',
       headers:{'Content-Type':'application/json','Authorization':'Bearer '+cfg.apiKey},
-      body:JSON.stringify({model:cfg.model||'deepseek-chat',messages:buildMessages(),temperature:0.8,max_tokens:300})
+      body:JSON.stringify({model:cfg.model||'deepseek-flash',messages:buildMessages(),temperature:0.8,max_tokens:300})
     });
     if(!res.ok){
       let emsg='HTTP '+res.status;
