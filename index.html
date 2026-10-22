@@ -425,14 +425,14 @@
           <div class="avatar">🌤️</div>
           <div>
             <div class="nm" id="ai-name-settings">小晴</div>
-            <div class="ds">你的 AI 情绪陪伴 · 规则模式免费可用，接入自己的 API 升级为真 AI</div>
+            <div class="ds">你的 AI 情绪陪伴 · 默认共享 DeepSeek，可接自己的 API 或切离线</div>
           </div>
         </div>
 
         <div class="section">
           <div class="slabel">AI 接口 · 自主接入（你自己的 Key）</div>
           <div class="row" style="flex-direction:column;align-items:stretch;gap:10px">
-            <div class="rtx"><div class="t">接口模式</div><div class="d">规则模式为内置演示（零成本）；AI 模式用你自己的大模型 Key 真实识别情绪并回应</div></div>
+            <div class="rtx"><div class="t">接口模式</div><div class="d">AI 模式默认用共享 DeepSeek（免配置）；填了 Key 则用你自己的接口；规则模式离线</div></div>
             <div class="seg" id="mode-seg" style="width:100%">
               <button data-m="rule" class="active">规则模式</button>
               <button data-m="ai">AI 模式</button>
@@ -490,7 +490,7 @@
         </div>
 
         <div class="privacy">
-          🔒 情绪记录与接口配置仅保存在你自己的浏览器（localStorage）；API Key 不会上传到任何服务器，对话仅发往你自己填写的接口地址。规则模式完全离线运行，不产生任何网络请求。
+          🔒 情绪记录与接口配置仅保存在你自己的浏览器；默认模式下对话发往共享 DeepSeek 服务，填了 Key 则直接发往你选的接口。规则模式完全离线。
         </div>
       </div>
     </section>
@@ -506,7 +506,7 @@
     <div class="modal-head">
       <div class="m-logo">🌤️</div>
       <div class="m-title">接入 AI，让心晴真正懂你</div>
-      <div class="m-sub">选一家主流大模型，填一次 API Key，之后自动记住、不再打扰。<br>也可以先跳过，用免费的规则模式。</div>
+      <div class="m-sub">默认直接用 DeepSeek，免配置、零门槛；也可以接自己的 Key 或切离线。<br>无论选哪种，之后都自动记住、不再打扰。</div>
     </div>
     <div class="providers" id="providers"></div>
     <div class="m-field">
@@ -522,10 +522,11 @@
       <input id="onboard-model" spellcheck="false" autocomplete="off" placeholder="deepseek-flash">
     </div>
     <div class="m-actions">
-      <button id="onboard-save" class="btn-primary">保存并开始</button>
-      <button id="onboard-skip" class="btn-ghost">先用规则模式，跳过</button>
+      <button id="onboard-shared" class="btn-primary">开始使用 · 默认 DeepSeek</button>
+      <button id="onboard-save" class="btn-ghost">保存并用自己的 Key</button>
+      <button id="onboard-skip" class="btn-ghost">离线规则模式（不联网）</button>
     </div>
-    <div class="m-note">🔒 API Key 只存在你自己的浏览器，直接发往所选服务商，不上传任何服务器。</div>
+    <div class="m-note">🔒 默认模式下使用共享 DeepSeek 服务；你自己的 Key 只存在浏览器、直接发往所选服务商。</div>
   </div>
 </div>
 
@@ -729,10 +730,11 @@ function renderForecast(){
 }
 
 /* ============ AI 接口配置 ============ */
-const cfg={mode:'rule', baseUrl:'https://api.deepseek.com', apiKey:'', model:'deepseek-flash', aiName:'小晴', aiPersona:'warm', aiCustomPrompt:''};
+const cfg={mode:'ai', baseUrl:'https://api.deepseek.com', apiKey:'', model:'deepseek-flash', aiName:'小晴', aiPersona:'warm', aiCustomPrompt:''};
+const SHARED_BACKEND='https://1503807332-0lay5cky55.ap-guangzhou.tencentscf.com';
 function loadCfg(){try{const s=JSON.parse(localStorage.getItem('xq_cfg')||'{}');Object.assign(cfg,s);}catch(_){}}
 function saveCfg(){try{localStorage.setItem('xq_cfg',JSON.stringify(cfg));}catch(_){}}
-function updateModePill(){const p=document.getElementById('mode-pill');if(p)p.textContent=cfg.mode==='ai'?'AI 模式':'规则模式';}
+function updateModePill(){const p=document.getElementById('mode-pill');if(p){if(cfg.mode==='rule')p.textContent='规则模式';else if(cfg.apiKey)p.textContent='AI 模式';else p.textContent='DeepSeek 默认';}}
 function updateAiName(){const n=cfg.aiName||'小晴';const a=document.getElementById('ai-name');if(a)a.textContent=n;const b=document.getElementById('ai-name-settings');if(b)b.textContent=n;}
 function apiEndpoint(){
   const base=(cfg.baseUrl||'https://api.deepseek.com').replace(/\/+$/,'');
@@ -830,11 +832,19 @@ function initOnboard(){
   if(done) return;
   if(cfg.apiKey){ try{localStorage.setItem('xq_onboarded','1');}catch(_){} return; }
   document.getElementById('onboard').style.display='flex';
+  const closeOnboard=()=>{document.getElementById('onboard').style.display='none';};
+  document.getElementById('onboard-shared').onclick=()=>{
+    cfg.mode='ai'; saveCfg();
+    syncModeSeg(); updateModePill();
+    try{localStorage.setItem('xq_onboarded','1');}catch(_){}
+    closeOnboard();
+    showToast('已默认使用 DeepSeek · 开始聊天吧');
+  };
   document.getElementById('onboard-save').onclick=()=>{
     const key=document.getElementById('onboard-key').value.trim();
     const base=document.getElementById('onboard-base').value.trim();
     const model=document.getElementById('onboard-model').value.trim();
-    if(!key){ showToast('请填写 API Key，或点「跳过」'); return; }
+    if(!key){ showToast('请先填写 API Key，或点「默认 DeepSeek」'); return; }
     cfg.baseUrl=base||'https://api.deepseek.com';
     cfg.apiKey=key;
     cfg.model=model||'deepseek-flash';
@@ -846,13 +856,15 @@ function initOnboard(){
     syncModeSeg();
     updateModePill();
     try{localStorage.setItem('xq_onboarded','1');}catch(_){}
-    document.getElementById('onboard').style.display='none';
+    closeOnboard();
     const name=(PROVIDERS.find(x=>x.id===selectedProvider)||{}).name||'AI';
     showToast('已接入 '+name+' · 进入 AI 模式');
   };
   document.getElementById('onboard-skip').onclick=()=>{
+    cfg.mode='rule'; saveCfg();
+    syncModeSeg(); updateModePill();
     try{localStorage.setItem('xq_onboarded','1');}catch(_){}
-    document.getElementById('onboard').style.display='none';
+    closeOnboard();
   };
 }
 
@@ -912,18 +924,21 @@ function respond(em){
   setTimeout(()=>{t.remove();addBubble(txt,'ai');pushHistory('assistant',txt);},700+Math.random()*500);
 }
 async function aiRespond(){
-  if(!cfg.apiKey){
-    addBubble('还没有配置 API Key 哦。去「设置 → AI 接口」填你自己的 Key 就能用真 AI 啦，或者继续用规则模式。','ai');
-    showToast('请先配置 API Key'); return;
-  }
+  const hasKey=!!cfg.apiKey;
   aiBusy=true;
   const t=showTyping();
   try{
-    const res=await fetch(apiEndpoint(),{
-      method:'POST',
-      headers:{'Content-Type':'application/json','Authorization':'Bearer '+cfg.apiKey},
-      body:JSON.stringify({model:cfg.model||'deepseek-flash',messages:buildMessages(),temperature:0.8,max_tokens:300})
-    });
+    const payload={messages:buildMessages(),temperature:0.8,max_tokens:300};
+    let url, headers;
+    if(hasKey){
+      url=apiEndpoint();
+      headers={'Content-Type':'application/json','Authorization':'Bearer '+cfg.apiKey};
+      payload.model=cfg.model||'deepseek-flash';
+    }else{
+      url=SHARED_BACKEND;
+      headers={'Content-Type':'application/json'};
+    }
+    const res=await fetch(url,{method:'POST',headers,body:JSON.stringify(payload)});
     if(!res.ok){
       let emsg='HTTP '+res.status;
       try{const e=await res.json();emsg=(e.error&&e.error.message)?e.error.message:emsg;}catch(_){}
