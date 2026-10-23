@@ -969,7 +969,7 @@ function parseAI(content){
 const scroll=document.getElementById('chat-scroll');
 function scrollBottom(){scroll.scrollTop=scroll.scrollHeight;}
 function addBubble(html,cls){const el=document.createElement('div');el.className='msg '+cls;el.innerHTML=html;scroll.appendChild(el);scrollBottom();return el;}
-function addEmotag(em,conf){const el=document.createElement('div');el.className='emotag';el.innerHTML=`<span class="dot" style="background:${EMOTIONS[em].color}"></span>识别到 ${EMOTIONS[em].name}`;scroll.appendChild(el);scrollBottom();}
+function addEmotag(em,conf){}
 function setMood(em){currentEmotion=em;const E=EMOTIONS[em]||EMOTIONS.calm;document.getElementById('mood-now').textContent=E.name;document.body.style.background=E.grad;document.documentElement.style.setProperty('--emo-color',E.color);document.documentElement.style.setProperty('--emo-soft',E.soft);renderRecommendations(em);}
 
 function showTyping(){
