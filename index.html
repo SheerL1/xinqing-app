@@ -186,6 +186,11 @@
   .rec-title{font-size:13px;font-weight:600;color:var(--muted)}
   .rec-main{font-size:16px;font-weight:600;line-height:1.5}
   .rec-tip{font-size:12.5px;color:var(--muted);margin-top:7px;line-height:1.55}
+  .media-list{display:flex;flex-direction:column;gap:8px;margin-top:2px}
+  .media-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;background:var(--emo-soft);text-decoration:none;color:var(--ink);transition:background .3s ease}
+  .media-item:hover{background:var(--accent-soft)}
+  .media-item .mi-name{font-size:14px;font-weight:600}
+  .media-item .mi-sub{font-size:12px;color:var(--muted);margin-left:auto;white-space:nowrap}
 
   /* ============ SETTINGS ============ */
   .me{display:flex;align-items:center;gap:16px;padding:20px;border:1px solid var(--border);border-radius:18px;background:var(--surface);margin-bottom:20px}
@@ -400,6 +405,17 @@
             <div class="rec-head"><span class="rec-ico">👕</span><span class="rec-title">衣着推荐</span></div>
             <div class="rec-main" id="rec-clothing">—</div>
             <div class="rec-tip" id="rec-clothing-tip">—</div>
+          </div>
+        </div>
+
+        <div class="rec-grid">
+          <div class="rec-card">
+            <div class="rec-head"><span class="rec-ico">🎵</span><span class="rec-title">音乐推荐 · 酷狗</span></div>
+            <div class="media-list" id="rec-music"></div>
+          </div>
+          <div class="rec-card">
+            <div class="rec-head"><span class="rec-ico">📚</span><span class="rec-title">阅读推荐 · 微信读书</span></div>
+            <div class="media-list" id="rec-books"></div>
           </div>
         </div>
 
@@ -788,6 +804,25 @@ function renderRecommendations(emotion){
   const el4=document.getElementById('rec-clothing-tip'); if(el4) el4.textContent=CLOTHING_MOOD[emotion]||CLOTHING_MOOD.calm;
 }
 
+/* ============ 音乐 / 阅读推荐（跳转酷狗 + 微信读书） ============ */
+const MOOD_MEDIA={
+  happy:{songs:[['晴天','周杰伦'],['小幸运','田馥甄'],['稻香','周杰伦']],books:[['小王子','圣埃克苏佩里'],['解忧杂货店','东野圭吾'],['云边有个小卖部','张嘉佳']]},
+  calm:{songs:[['成都','赵雷'],['贝加尔湖畔','李健'],['平凡之路','朴树']],books:[['瓦尔登湖','梭罗'],['人间草木','汪曾祺'],['生活的艺术','林语堂']]},
+  anxious:{songs:[['慢慢喜欢你','莫文蔚'],['当你老了','赵照'],['岁月神偷','金玟岐']],books:[['当下的力量','埃克哈特·托利'],['被讨厌的勇气','岸见一郎'],['焦虑的人','弗雷德里克·巴克曼']]},
+  tired:{songs:[['夜空中最亮的星','逃跑计划'],['追光者','岑宁儿'],['小城故事','邓丽君']],books:[['山茶文具店','小川糸'],['世界尽头的咖啡馆','约翰·史崔勒基'],['明天也是小春日和','津端英子']]},
+  sad:{songs:[['海阔天空','Beyond'],['阳光总在风雨后','许美静'],['倔强','五月天']],books:[['偷影子的人','马克·李维'],['追风筝的人','卡勒德·胡赛尼'],['平凡的世界','路遥']]},
+  angry:{songs:[['逆战','张杰'],['光辉岁月','Beyond'],['追梦赤子心','GALA']],books:[['非暴力沟通','马歇尔·卢森堡'],['蛤蟆先生去看心理医生','罗伯特·戴博德'],['情绪的解析','保罗·艾克曼']]},
+};
+function kgUrl(n,a){return 'https://www.kugou.com/yy/html/search.html#searchType=song&searchKeyWord='+encodeURIComponent(n+' '+a);}
+function wrUrl(n){return 'https://weread.qq.com/web/search/books?keyword='+encodeURIComponent(n);}
+function renderMedia(emotion){
+  const m=MOOD_MEDIA[emotion]||MOOD_MEDIA.calm;
+  const me=document.getElementById('rec-music');
+  const be=document.getElementById('rec-books');
+  if(me) me.innerHTML=m.songs.map(s=>'<a class="media-item" href="'+kgUrl(s[0],s[1])+'" target="_blank" rel="noopener"><span class="mi-name">'+s[0]+'</span><span class="mi-sub">'+s[1]+' ↗</span></a>').join('');
+  if(be) be.innerHTML=m.books.map(b=>'<a class="media-item" href="'+wrUrl(b[0])+'" target="_blank" rel="noopener"><span class="mi-name">'+b[0]+'</span><span class="mi-sub">'+b[1]+' ↗</span></a>').join('');
+}
+
 /* ============ AI 接口配置 ============ */
 const cfg={mode:'ai', baseUrl:'https://api.deepseek.com', apiKey:'', model:'deepseek-flash', aiName:'小晴', aiPersona:'warm', aiCustomPrompt:''};
 const SHARED_BACKEND='https://1503807332-0lay5cky55.ap-guangzhou.tencentscf.com';
@@ -970,7 +1005,7 @@ const scroll=document.getElementById('chat-scroll');
 function scrollBottom(){scroll.scrollTop=scroll.scrollHeight;}
 function addBubble(html,cls){const el=document.createElement('div');el.className='msg '+cls;el.innerHTML=html;scroll.appendChild(el);scrollBottom();return el;}
 function addEmotag(em,conf){}
-function setMood(em){currentEmotion=em;const E=EMOTIONS[em]||EMOTIONS.calm;document.getElementById('mood-now').textContent=E.name;document.body.style.background=E.grad;document.documentElement.style.setProperty('--emo-color',E.color);document.documentElement.style.setProperty('--emo-soft',E.soft);renderRecommendations(em);}
+function setMood(em){currentEmotion=em;const E=EMOTIONS[em]||EMOTIONS.calm;document.getElementById('mood-now').textContent=E.name;document.body.style.background=E.grad;document.documentElement.style.setProperty('--emo-color',E.color);document.documentElement.style.setProperty('--emo-soft',E.soft);renderRecommendations(em);renderMedia(em);}
 
 function showTyping(){
   const el=document.createElement('div');el.className='typing';
@@ -1090,6 +1125,7 @@ document.body.style.background=EMOTIONS.happy.grad;document.documentElement.styl
 renderCalendar();
 renderForecast();
 renderRecommendations('happy');
+renderMedia('happy');
 initOnboard();
 seed();
 </script>
