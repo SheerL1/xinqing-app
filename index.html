@@ -14,6 +14,8 @@
     --border:#ECE5DA;
     --accent:#E8684A;
     --accent-soft:#FBEAE3;
+    --emo-color:#E8684A;
+    --emo-soft:#FAF7F2;
     --serif:"Songti SC","STSong","Noto Serif SC",serif;
     --sans:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei","Segoe UI",sans-serif;
   }
@@ -101,14 +103,15 @@
   .chat-composer{flex:0 0 auto;padding:16px 24px 22px;border-top:1px solid var(--border);background:var(--surface)}
   .chat-composer .row{display:flex;gap:12px;max-width:800px;margin:0 auto}
   .chat-composer input{
-    flex:1;border:1px solid var(--border);border-radius:999px;padding:14px 18px;
-    font-size:15px;font-family:var(--sans);background:#FAF7F2;color:var(--ink);outline:none;
+    flex:1;border:1px solid var(--emo-color);border-radius:999px;padding:14px 18px;
+    font-size:15px;font-family:var(--sans);background:var(--emo-soft);color:var(--ink);outline:none;
+    transition:border-color .6s ease, background .6s ease;
   }
-  .chat-composer input:focus{border-color:var(--accent)}
+  .chat-composer input:focus{border-color:var(--emo-color);box-shadow:0 0 0 3px var(--emo-soft)}
   .send{
-    width:50px;height:50px;border-radius:50%;border:none;background:var(--accent);
+    width:50px;height:50px;border-radius:50%;border:none;background:var(--emo-color);
     color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;
-    flex:0 0 50px;transition:transform .12s;
+    flex:0 0 50px;transition:background .6s ease, transform .12s;
   }
   .send:active{transform:scale(.92)}
   .send svg{width:22px;height:22px}
@@ -966,8 +969,8 @@ function parseAI(content){
 const scroll=document.getElementById('chat-scroll');
 function scrollBottom(){scroll.scrollTop=scroll.scrollHeight;}
 function addBubble(html,cls){const el=document.createElement('div');el.className='msg '+cls;el.innerHTML=html;scroll.appendChild(el);scrollBottom();return el;}
-function addEmotag(em,conf){const el=document.createElement('div');el.className='emotag';el.innerHTML=`<span class="dot" style="background:${EMOTIONS[em].color}"></span>识别到 ${EMOTIONS[em].name} · ${conf}%`;scroll.appendChild(el);scrollBottom();}
-function setMood(em){currentEmotion=em;document.getElementById('mood-now').textContent=EMOTIONS[em].name;const g=(EMOTIONS[em]||EMOTIONS.calm).grad;document.body.style.background=g;renderRecommendations(em);}
+function addEmotag(em,conf){const el=document.createElement('div');el.className='emotag';el.innerHTML=`<span class="dot" style="background:${EMOTIONS[em].color}"></span>识别到 ${EMOTIONS[em].name}`;scroll.appendChild(el);scrollBottom();}
+function setMood(em){currentEmotion=em;const E=EMOTIONS[em]||EMOTIONS.calm;document.getElementById('mood-now').textContent=E.name;document.body.style.background=E.grad;document.documentElement.style.setProperty('--emo-color',E.color);document.documentElement.style.setProperty('--emo-soft',E.soft);renderRecommendations(em);}
 
 function showTyping(){
   const el=document.createElement('div');el.className='typing';
@@ -1083,7 +1086,7 @@ loadMoodLog();
 loadCfg();
 bindCfg();
 updateModePill();
-document.body.style.background=EMOTIONS.happy.grad;
+document.body.style.background=EMOTIONS.happy.grad;document.documentElement.style.setProperty('--emo-color',EMOTIONS.happy.color);document.documentElement.style.setProperty('--emo-soft',EMOTIONS.happy.soft);
 renderCalendar();
 renderForecast();
 renderRecommendations('happy');
