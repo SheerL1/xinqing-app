@@ -191,6 +191,8 @@
   .media-item:hover{background:var(--accent-soft)}
   .media-item .mi-name{font-size:14px;font-weight:600}
   .media-item .mi-sub{font-size:12px;color:var(--muted);margin-left:auto;white-space:nowrap}
+  .media-item .mi-cover{width:44px;height:44px;border-radius:8px;flex:0 0 44px;background:linear-gradient(135deg,var(--emo-color),var(--emo-soft));display:flex;align-items:center;justify-content:center;font-size:20px;overflow:hidden}
+  .media-item .mi-cover img{width:100%;height:100%;object-fit:cover;display:block}
 
   /* ============ SETTINGS ============ */
   .me{display:flex;align-items:center;gap:16px;padding:20px;border:1px solid var(--border);border-radius:18px;background:var(--surface);margin-bottom:20px}
@@ -844,14 +846,33 @@ const MOOD_MEDIA={
 };
 function kgUrl(n,a){return 'https://www.kugou.com/yy/html/search.html#searchType=song&searchKeyWord='+encodeURIComponent(n+' '+a);}
 function wrUrl(n){return 'https://weread.qq.com/web/search/books?keyword='+encodeURIComponent(n);}
-function renderMediaList(id,items,fn){
+function renderMediaList(id,items,fn,kind){
   const el=document.getElementById(id);
-  if(el) el.innerHTML=items.map(it=>'<a class="media-item" href="'+fn(it[0],it[1])+'" target="_blank" rel="noopener"><span class="mi-name">'+it[0]+'</span><span class="mi-sub">'+it[1]+' ↗</span></a>').join('');
+  if(!el) return;
+  el.innerHTML=items.map(it=>'<a class="media-item" href="'+fn(it[0],it[1])+'" target="_blank" rel="noopener"><span class="mi-cover">'+(kind==='ebook'?'📖':'🎵')+'</span><span class="mi-name">'+it[0]+'</span><span class="mi-sub">'+it[1]+' ↗</span></a>').join('');
+  el.querySelectorAll('.media-item').forEach((a,i)=>{ const it=items[i]; if(it) fetchCover(it[0],it[1],a.querySelector('.mi-cover'),kind); });
+}
+async function fetchCover(name,sub,coverEl,kind){
+  const q=encodeURIComponent((name+' '+(sub||'')).trim());
+  const tail=kind==='ebook'?'&entity=ebook':'&media=music';
+  try{
+    const res=await fetch('https://itunes.apple.com/search?term='+q+'&limit=1'+tail);
+    const data=await res.json();
+    const art=data.results&&data.results[0]&&data.results[0].artworkUrl100;
+    if(art){
+      const img=document.createElement('img');
+      img.src=art.replace('100x100bb','300x300bb');
+      img.alt=name;
+      img.onload=()=>{ coverEl.textContent=''; coverEl.appendChild(img); };
+      img.onerror=()=>{ img.remove(); };
+      coverEl.appendChild(img);
+    }
+  }catch(e){}
 }
 function renderMedia(emotion){
   const m=MOOD_MEDIA[emotion]||MOOD_MEDIA.calm;
-  renderMediaList('rec-music',m.songs,kgUrl);
-  renderMediaList('rec-books',m.books,wrUrl);
+  renderMediaList('rec-music',m.songs,kgUrl,'music');
+  renderMediaList('rec-books',m.books,wrUrl,'ebook');
 }
 function extractJSON(text){
   const t=String(text||'').replace(/```json|```/g,'');
@@ -876,8 +897,8 @@ async function aiMedia(emotion){
     const content=(data.choices&&data.choices[0]&&data.choices[0].message&&data.choices[0].message.content)||'';
     const j=extractJSON(content);
     if(j&&Array.isArray(j.songs)&&Array.isArray(j.books)&&j.songs.length&&j.books.length){
-      renderMediaList('rec-music',j.songs.map(s=>[s.name,s.artist]),kgUrl);
-      renderMediaList('rec-books',j.books.map(b=>[b.name,b.author]),wrUrl);
+      renderMediaList('rec-music',j.songs.map(s=>[s.name,s.artist]),kgUrl,'music');
+      renderMediaList('rec-books',j.books.map(b=>[b.name,b.author]),wrUrl,'ebook');
       return;
     }
     throw new Error('bad json');
