@@ -815,12 +815,44 @@ const MOOD_MEDIA={
 };
 function kgUrl(n,a){return 'https://www.kugou.com/yy/html/search.html#searchType=song&searchKeyWord='+encodeURIComponent(n+' '+a);}
 function wrUrl(n){return 'https://weread.qq.com/web/search/books?keyword='+encodeURIComponent(n);}
+function renderMediaList(id,items,fn){
+  const el=document.getElementById(id);
+  if(el) el.innerHTML=items.map(it=>'<a class="media-item" href="'+fn(it[0],it[1])+'" target="_blank" rel="noopener"><span class="mi-name">'+it[0]+'</span><span class="mi-sub">'+it[1]+' ↗</span></a>').join('');
+}
 function renderMedia(emotion){
   const m=MOOD_MEDIA[emotion]||MOOD_MEDIA.calm;
-  const me=document.getElementById('rec-music');
-  const be=document.getElementById('rec-books');
-  if(me) me.innerHTML=m.songs.map(s=>'<a class="media-item" href="'+kgUrl(s[0],s[1])+'" target="_blank" rel="noopener"><span class="mi-name">'+s[0]+'</span><span class="mi-sub">'+s[1]+' ↗</span></a>').join('');
-  if(be) be.innerHTML=m.books.map(b=>'<a class="media-item" href="'+wrUrl(b[0])+'" target="_blank" rel="noopener"><span class="mi-name">'+b[0]+'</span><span class="mi-sub">'+b[1]+' ↗</span></a>').join('');
+  renderMediaList('rec-music',m.songs,kgUrl);
+  renderMediaList('rec-books',m.books,wrUrl);
+}
+function extractJSON(text){
+  const t=String(text||'').replace(/```json|```/g,'');
+  const s=t.indexOf('{'), e=t.lastIndexOf('}');
+  if(s<0||e<=s) return null;
+  try{ return JSON.parse(t.slice(s,e+1)); }catch(_){ return null; }
+}
+let lastMediaEmotion=null;
+async function aiMedia(emotion){
+  const E=EMOTIONS[emotion]||EMOTIONS.calm;
+  const lastUser=(history.filter(h=>h.role==='user').slice(-1)[0]||{}).content;
+  const prompt=(lastUser?'用户最近说：「'+lastUser+'」。':'')+'此刻心情是「'+E.name+'」。请据此推荐 3 首适合现在听的歌（真实存在的中文歌）和 3 本适合现在读的书（真实存在的书）。只返回 JSON，不要任何解释，严格格式：{"songs":[{"name":"歌名","artist":"歌手"},{"name":"歌名","artist":"歌手"},{"name":"歌名","artist":"歌手"}],"books":[{"name":"书名","author":"作者"},{"name":"书名","author":"作者"},{"name":"书名","author":"作者"}]}';
+  try{
+    const hasKey=!!cfg.apiKey;
+    const payload={messages:[{role:'system',content:'你是推荐助手，直接输出 JSON 结果，不要输出任何思考过程或解释。'},{role:'user',content:prompt}],temperature:0.9,max_tokens:2000};
+    let url, headers;
+    if(hasKey){ url=apiEndpoint(); headers={'Content-Type':'application/json','Authorization':'Bearer '+cfg.apiKey}; payload.model=cfg.model||'deepseek-flash'; }
+    else{ url=SHARED_BACKEND; headers={'Content-Type':'application/json'}; }
+    const res=await fetch(url,{method:'POST',headers,body:JSON.stringify(payload)});
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const data=await res.json();
+    const content=(data.choices&&data.choices[0]&&data.choices[0].message&&data.choices[0].message.content)||'';
+    const j=extractJSON(content);
+    if(j&&Array.isArray(j.songs)&&Array.isArray(j.books)&&j.songs.length&&j.books.length){
+      renderMediaList('rec-music',j.songs.map(s=>[s.name,s.artist]),kgUrl);
+      renderMediaList('rec-books',j.books.map(b=>[b.name,b.author]),wrUrl);
+      return;
+    }
+    throw new Error('bad json');
+  }catch(e){ renderMedia(emotion); }
 }
 
 /* ============ AI 接口配置 ============ */
@@ -1005,7 +1037,7 @@ const scroll=document.getElementById('chat-scroll');
 function scrollBottom(){scroll.scrollTop=scroll.scrollHeight;}
 function addBubble(html,cls){const el=document.createElement('div');el.className='msg '+cls;el.innerHTML=html;scroll.appendChild(el);scrollBottom();return el;}
 function addEmotag(em,conf){}
-function setMood(em){currentEmotion=em;const E=EMOTIONS[em]||EMOTIONS.calm;document.getElementById('mood-now').textContent=E.name;document.body.style.background=E.grad;document.documentElement.style.setProperty('--emo-color',E.color);document.documentElement.style.setProperty('--emo-soft',E.soft);renderRecommendations(em);renderMedia(em);}
+function setMood(em){currentEmotion=em;const E=EMOTIONS[em]||EMOTIONS.calm;document.getElementById('mood-now').textContent=E.name;document.body.style.background=E.grad;document.documentElement.style.setProperty('--emo-color',E.color);document.documentElement.style.setProperty('--emo-soft',E.soft);renderRecommendations(em);if(cfg.mode==='ai'){if(em!==lastMediaEmotion){lastMediaEmotion=em;aiMedia(em);}}else{renderMedia(em);}}
 
 function showTyping(){
   const el=document.createElement('div');el.className='typing';
@@ -1022,7 +1054,7 @@ async function aiRespond(){
   aiBusy=true;
   const t=showTyping();
   try{
-    const payload={messages:buildMessages(),temperature:0.8,max_tokens:300};
+    const payload={messages:buildMessages(),temperature:0.8,max_tokens:1000};
     let url, headers;
     if(hasKey){
       url=apiEndpoint();
