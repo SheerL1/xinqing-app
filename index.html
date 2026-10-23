@@ -187,8 +187,12 @@
   .rec-main{font-size:16px;font-weight:600;line-height:1.5}
   .rec-tip{font-size:12.5px;color:var(--muted);margin-top:7px;line-height:1.55}
   .media-list{display:flex;flex-direction:column;gap:8px;margin-top:2px}
-  .media-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;background:var(--emo-soft);text-decoration:none;color:var(--ink);transition:background .3s ease}
+  .media-item{display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:12px;background:var(--emo-soft);transition:background .3s ease}
   .media-item:hover{background:var(--accent-soft)}
+  .media-link{display:flex;align-items:center;gap:10px;flex:1;min-width:0;text-decoration:none;color:var(--ink)}
+  .mi-like{background:none;border:none;cursor:pointer;font-size:19px;line-height:1;color:var(--faint);padding:4px;flex:0 0 auto;transition:color .2s,transform .2s}
+  .mi-like:hover{transform:scale(1.2)}
+  .mi-like.liked{color:#E8684A}
   .media-item .mi-name{font-size:14px;font-weight:600}
   .media-item .mi-sub{font-size:12px;color:var(--muted);margin-left:auto;white-space:nowrap}
   .media-item .mi-cover{width:44px;height:44px;border-radius:8px;flex:0 0 44px;background:linear-gradient(135deg,var(--emo-color),var(--emo-soft));display:flex;align-items:center;justify-content:center;font-size:20px;overflow:hidden}
@@ -846,11 +850,46 @@ const MOOD_MEDIA={
 };
 function kgUrl(n,a){return 'https://www.kugou.com/yy/html/search.html#searchType=song&searchKeyWord='+encodeURIComponent(n+' '+a);}
 function wrUrl(n){return 'https://weread.qq.com/web/search/books?keyword='+encodeURIComponent(n);}
+const PREFS_KEY='xinqing_prefs';
+function loadPrefs(){ try{ const o=JSON.parse(localStorage.getItem(PREFS_KEY)||'{"songs":[],"books":[]}'); if(o&&Array.isArray(o.songs)&&Array.isArray(o.books)) return o; }catch(e){} return {songs:[],books:[]}; }
+function savePrefs(p){ try{ localStorage.setItem(PREFS_KEY,JSON.stringify(p)); }catch(e){} }
+function isLiked(kind,name,sub){
+  const p=loadPrefs(); const list=kind==='ebook'?p.books:p.songs; const k=kind==='ebook'?'author':'artist';
+  return list.some(x=>x.name===name && (x[k]||'')===(sub||''));
+}
+function toggleLike(kind,name,sub){
+  const p=loadPrefs(); const list=kind==='ebook'?p.books:p.songs; const k=kind==='ebook'?'author':'artist';
+  const idx=list.findIndex(x=>x.name===name && (x[k]||'')===(sub||''));
+  if(idx>=0) list.splice(idx,1);
+  else list.push(kind==='ebook'?{name:name,author:sub}:{name:name,artist:sub});
+  savePrefs(p);
+}
 function renderMediaList(id,items,fn,kind){
   const el=document.getElementById(id);
   if(!el) return;
-  el.innerHTML=items.map(it=>'<a class="media-item" href="'+fn(it[0],it[1])+'" target="_blank" rel="noopener"><span class="mi-cover">'+(kind==='ebook'?'📖':'🎵')+'</span><span class="mi-name">'+it[0]+'</span><span class="mi-sub">'+it[1]+' ↗</span></a>').join('');
-  el.querySelectorAll('.media-item').forEach((a,i)=>{ const it=items[i]; if(it) fetchCover(it[0],it[1],a.querySelector('.mi-cover'),kind); });
+  el.innerHTML=items.map(it=>{
+    const liked=isLiked(kind,it[0],it[1]);
+    return '<div class="media-item">'+
+      '<a class="media-link" href="'+fn(it[0],it[1])+'" target="_blank" rel="noopener">'+
+        '<span class="mi-cover">'+(kind==='ebook'?'📖':'🎵')+'</span>'+
+        '<span class="mi-name">'+it[0]+'</span>'+
+        '<span class="mi-sub">'+it[1]+' ↗</span>'+
+      '</a>'+
+      '<button class="mi-like'+(liked?' liked':'')+'" title="'+(liked?'取消喜欢':'喜欢')+'">'+(liked?'♥':'♡')+'</button>'+
+    '</div>';
+  }).join('');
+  el.querySelectorAll('.media-item').forEach((div,i)=>{
+    const it=items[i]; if(!it) return;
+    fetchCover(it[0],it[1],div.querySelector('.mi-cover'),kind);
+    const btn=div.querySelector('.mi-like');
+    btn.onclick=()=>{
+      const now=!isLiked(kind,it[0],it[1]);
+      toggleLike(kind,it[0],it[1]);
+      btn.classList.toggle('liked',now);
+      btn.textContent=now?'♥':'♡';
+      btn.title=now?'取消喜欢':'喜欢';
+    };
+  });
 }
 async function fetchCover(name,sub,coverEl,kind){
   const q=encodeURIComponent((name+' '+(sub||'')).trim());
@@ -884,10 +923,15 @@ let lastMediaEmotion=null;
 async function aiMedia(emotion){
   const E=EMOTIONS[emotion]||EMOTIONS.calm;
   const lastUser=(history.filter(h=>h.role==='user').slice(-1)[0]||{}).content;
-  const prompt=(lastUser?'用户最近说：「'+lastUser+'」。':'')+'此刻心情是「'+E.name+'」。请据此推荐 3 首适合现在听的歌（真实存在的中文歌）和 3 本适合现在读的书（真实存在的书）。只返回 JSON，不要任何解释，严格格式：{"songs":[{"name":"歌名","artist":"歌手"},{"name":"歌名","artist":"歌手"},{"name":"歌名","artist":"歌手"}],"books":[{"name":"书名","author":"作者"},{"name":"书名","author":"作者"},{"name":"书名","author":"作者"}]}';
+  const p=loadPrefs();
+  const likedSongs=p.songs.map(s=>s.name+(s.artist?'（'+s.artist+'）':'')).join('、');
+  const likedBooks=p.books.map(b=>b.name+(b.author?'（'+b.author+'）':'')).join('、');
+  let pref='';
+  if(likedSongs||likedBooks){ pref='用户偏好参考：'; if(likedSongs) pref+='喜欢的歌：'+likedSongs+'。'; if(likedBooks) pref+='喜欢的书：'+likedBooks+'。'; }
+  const prompt=pref+(lastUser?'用户最近说：「'+lastUser+'」。':'')+'此刻心情是「'+E.name+'」。请据此推荐 20 首适合现在听的歌（真实存在的中文歌，可参考用户偏好）和 10 本适合现在读的书（真实存在的书，可参考用户偏好）。只返回 JSON，不要任何解释，严格格式：{"songs":[{"name":"歌名","artist":"歌手"},...共20个],"books":[{"name":"书名","author":"作者"},...共10个]}';
   try{
     const hasKey=!!cfg.apiKey;
-    const payload={messages:[{role:'system',content:'你是推荐助手，直接输出 JSON 结果，不要输出任何思考过程或解释。'},{role:'user',content:prompt}],temperature:0.9,max_tokens:2000};
+    const payload={messages:[{role:'system',content:'你是推荐助手，直接输出 JSON 结果，不要输出任何思考过程或解释。'},{role:'user',content:prompt}],temperature:0.9,max_tokens:4000};
     let url, headers;
     if(hasKey){ url=apiEndpoint(); headers={'Content-Type':'application/json','Authorization':'Bearer '+cfg.apiKey}; payload.model=cfg.model||'deepseek-flash'; }
     else{ url=SHARED_BACKEND; headers={'Content-Type':'application/json'}; }
