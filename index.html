@@ -535,6 +535,14 @@
         </div>
 
         <div class="section">
+          <div class="slabel">账号</div>
+          <div class="row">
+            <div class="rtx"><div class="t" id="account-name">未登录</div><div class="d">登录后数据云端同步、按账号隔离</div></div>
+            <button id="account-logout" class="btn-ghost" style="display:none">退出登录</button>
+          </div>
+        </div>
+
+        <div class="section">
           <div class="slabel">AI 接口 · 自主接入（你自己的 Key）</div>
           <div class="row" style="flex-direction:column;align-items:stretch;gap:10px">
             <div class="rtx"><div class="t">接口模式</div><div class="d">AI 模式默认用共享 DeepSeek（免配置）；填了 Key 则用你自己的接口；规则模式离线</div></div>
@@ -1484,8 +1492,10 @@ function setAuthMode(mode){
 function refreshAuthLine(){
   const line=document.getElementById('auth-line');
   const btn=document.getElementById('logout-btn');
-  if(authUser){ line.textContent='👤 '+authUser; if(btn) btn.style.display='block'; }
-  else { line.textContent='未登录'; if(btn) btn.style.display='none'; }
+  const an=document.getElementById('account-name');
+  const al=document.getElementById('account-logout');
+  if(authUser){ line.textContent='👤 '+authUser; if(btn) btn.style.display='block'; if(an) an.textContent='👤 '+authUser; if(al) al.style.display='inline-block'; }
+  else { line.textContent='未登录'; if(btn) btn.style.display='none'; if(an) an.textContent='未登录'; if(al) al.style.display='none'; }
 }
 async function doAuth(){
   const u=document.getElementById('auth-user').value.trim();
@@ -1516,6 +1526,7 @@ function initAuth(){
   document.getElementById('auth-go').onclick=doAuth;
   document.getElementById('auth-switch').onclick=()=>setAuthMode(authMode==='login'?'register':'login');
   const lb=document.getElementById('logout-btn'); if(lb) lb.onclick=logout;
+  const al=document.getElementById('account-logout'); if(al) al.onclick=logout;
   setAuthMode('login');
   if(isAuthed()){
     syncLoad().then(()=>{ loadMoodLog(); renderCalendar(); updateModePill(); if(!cfg.apiKey){ initOnboard(); } });
