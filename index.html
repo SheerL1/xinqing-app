@@ -1233,13 +1233,7 @@ function showToast(t){
 function seed(){
   addBubble('早上好呀，今天天气不错 ☀️ 感觉怎么样？','ai');
   pushHistory('assistant','早上好呀，今天天气不错，感觉怎么样？');
-  setTimeout(()=>{
-    addBubble('今天还挺开心的，天气好，心情也好','user');
-    pushHistory('user','今天还挺开心的，天气好，心情也好');
-    addEmotag('happy',92);
-    setMood('happy');
-    respond('happy');
-  },500);
+  setMood('happy');
 }
 
 /* ============ 启动 ============ */
