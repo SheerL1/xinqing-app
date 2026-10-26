@@ -400,11 +400,11 @@
         </div>
 
         <div class="weather-grid">
-          <div class="wcard" style="background:linear-gradient(135deg,#5B7DB1,#7FA6C9)">
-            <span class="wp">☀️</span>
-            <div class="big">21°C</div>
-            <div class="city">重庆 · 晴 · 今日</div>
-            <div class="predict">预测心情：<b>开心偏平静</b> · 今天是适合出门走走的日子</div>
+          <div class="wcard" id="wcard" style="background:linear-gradient(135deg,#5B7DB1,#7FA6C9)">
+            <span class="wp" id="wcard-icon">☀️</span>
+            <div class="big" id="wcard-temp">21°C</div>
+            <div class="city" id="wcard-city">重庆 · 晴 · 今日</div>
+            <div class="predict" id="wcard-predict">预测心情：<b>开心偏平静</b> · 今天是适合出门走走的日子</div>
           </div>
           <div class="forecast" id="forecast"></div>
         </div>
@@ -1232,13 +1232,83 @@ function showToast(t){
 /* ============ 初始引导对话 ============ */
 function weatherGreeting(){
   const w=TODAY_WEATHER||{type:'晴',temp:21};
-  const map={'晴':'今天阳光正好 ☀️','多云':'今天多云 ☁️','阴':'今天天有点阴 ☁️','小雨':'今天下着小雨 🌧️','大雨':'今天雨挺大 🌧️','雪':'今天下雪了 ❄️'};
+  const map={'晴':'今天阳光正好 ☀️','多云':'今天多云 ☁️','阴':'今天天有点阴 ☁️','小雨':'今天下着小雨 🌧️','雨':'今天有雨 🌧️','阵雨':'今天有阵雨 🌧️','雷雨':'今天有雷阵雨 ⛈️','大雨':'今天雨挺大 🌧️','雪':'今天下雪了 ❄️','雾':'今天有雾 🌫️'};
   const d=map[w.type]||('今天是'+w.type+'天');
   return d+'，'+(w.temp!=null?w.temp+'°C，':'')+'感觉怎么样？';
 }
+function weatherType(code){
+  if(code===0) return {type:'晴', emoji:'☀️', grad:'linear-gradient(135deg,#5B7DB1,#7FA6C9)'};
+  if(code<=2) return {type:'多云', emoji:'⛅', grad:'linear-gradient(135deg,#7A8BA0,#A3B3C4)'};
+  if(code===3) return {type:'阴', emoji:'☁️', grad:'linear-gradient(135deg,#8A8FA0,#B0B5C0)'};
+  if(code>=45&&code<=48) return {type:'雾', emoji:'🌫️', grad:'linear-gradient(135deg,#9AA0A8,#C0C4C8)'};
+  if(code>=51&&code<=57) return {type:'小雨', emoji:'🌦️', grad:'linear-gradient(135deg,#5B7DB1,#7FA6C9)'};
+  if(code>=61&&code<=67) return {type:'雨', emoji:'🌧️', grad:'linear-gradient(135deg,#4A6FA5,#6C8BB5)'};
+  if(code>=71&&code<=77) return {type:'雪', emoji:'❄️', grad:'linear-gradient(135deg,#8FA6C4,#C0D2E4)'};
+  if(code>=80&&code<=82) return {type:'阵雨', emoji:'🌧️', grad:'linear-gradient(135deg,#4A6FA5,#6C8BB5)'};
+  if(code>=95) return {type:'雷雨', emoji:'⛈️', grad:'linear-gradient(135deg,#5A6A8A,#7A8AA0)'};
+  return {type:'多云', emoji:'⛅', grad:'linear-gradient(135deg,#7A8BA0,#A3B3C4)'};
+}
+function moodFromWeather(type){
+  if(type==='晴') return '开心';
+  if(type==='多云'||type==='阴') return '平静';
+  if(type==='小雨'||type==='雨'||type==='阵雨'||type==='雷雨') return '低落';
+  if(type==='雪') return '平静';
+  if(type==='雾') return '疲惫';
+  return '平静';
+}
+function moodTip(type){
+  if(type==='晴') return '今天是适合出门走走的日子';
+  if(type==='多云'||type==='阴') return '阴天适合放慢节奏';
+  if(type==='小雨'||type==='雨'||type==='阵雨'||type==='雷雨') return '雨天记得带伞，给自己一点独处时间';
+  if(type==='雪') return '下雪天，注意保暖';
+  if(type==='雾') return '雾天出行注意安全';
+  return '照顾好自己';
+}
+function dayName(dateStr){
+  const d=new Date(dateStr+'T00:00:00');
+  const today=new Date(); today.setHours(0,0,0,0);
+  const diff=Math.round((d-today)/86400000);
+  if(diff===0) return '今天';
+  if(diff===1) return '明天';
+  return '周'+'日一二三四五六'[d.getDay()];
+}
+let greetingBubble=null;
+async function fetchRealWeather(){
+  try{
+    if(!navigator.geolocation) throw new Error('无定位能力');
+    const pos=await new Promise((res,rej)=>{ navigator.geolocation.getCurrentPosition(res,rej,{timeout:8000,maximumAge:600000}); });
+    const lat=pos.coords.latitude.toFixed(4), lon=pos.coords.longitude.toFixed(4);
+    let cityName='';
+    try{
+      const g=await fetch('https://api.bigdatacloud.net/data/reverse-geocode-client?latitude='+lat+'&longitude='+lon+'&localityLanguage=zh');
+      const gd=await g.json();
+      cityName=(gd.city||gd.locality||gd.principalSubdivision||'').replace(/[區区]$/,'');
+    }catch(e){}
+    const w=await fetch('https://api.open-meteo.com/v1/forecast?latitude='+lat+'&longitude='+lon+'&current_weather=true&daily=weathercode,temperature_2m_max&timezone=auto');
+    const wd=await w.json();
+    const cur=wd.current_weather||{};
+    const wt=weatherType(cur.weathercode);
+    const temp=Math.round(cur.temperature);
+    TODAY_WEATHER.type=wt.type; TODAY_WEATHER.temp=temp;
+    const card=document.getElementById('wcard'); if(card) card.style.background=wt.grad;
+    const e1=document.getElementById('wcard-icon'); if(e1) e1.textContent=wt.emoji;
+    const e2=document.getElementById('wcard-temp'); if(e2) e2.textContent=temp+'°C';
+    const e3=document.getElementById('wcard-city'); if(e3) e3.textContent=(cityName||'当前位置')+' · '+wt.type+' · 今日';
+    const m=moodFromWeather(wt.type);
+    const e4=document.getElementById('wcard-predict'); if(e4) e4.innerHTML='预测心情：<b>'+m+'</b> · '+moodTip(wt.type);
+    if(wd.daily&&wd.daily.time&&wd.daily.time.length){
+      const codes=wd.daily.weathercode||[], maxs=wd.daily.temperature_2m_max||[];
+      FC.length=0;
+      wd.daily.time.slice(0,7).forEach((d,i)=>{ const w2=weatherType(codes[i]); FC.push([dayName(d), w2.emoji, Math.round(maxs[i])+'°', moodFromWeather(w2.type)]); });
+      renderForecast();
+    }
+    if(greetingBubble){ greetingBubble.textContent=weatherGreeting(); }
+    renderRecommendations(currentEmotion||'happy');
+  }catch(e){ /* 定位被拒或接口失败：保持默认重庆·晴 */ }
+}
 function seed(){
   const g=weatherGreeting();
-  addBubble(g,'ai');
+  greetingBubble=addBubble(g,'ai');
   pushHistory('assistant',g);
   setMood('happy');
 }
@@ -1255,6 +1325,7 @@ renderRecommendations('happy');
 renderMedia('happy');
 initOnboard();
 seed();
+fetchRealWeather();
 </script>
 </body>
 </html>
