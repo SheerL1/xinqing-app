@@ -199,6 +199,9 @@
   .rec-title{font-size:13px;font-weight:600;color:var(--muted)}
   .rec-main{font-size:16px;font-weight:600;line-height:1.5}
   .rec-tip{font-size:12.5px;color:var(--muted);margin-top:7px;line-height:1.55}
+  .refresh-btn{margin-left:auto;background:none;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:5px 12px;font-size:12.5px;cursor:pointer;font-family:var(--sans);transition:all .15s;flex:0 0 auto}
+  .refresh-btn:hover{border-color:var(--accent);color:var(--accent)}
+  .refresh-btn:active{transform:scale(.95)}
   .media-list{display:flex;flex-direction:column;gap:8px;margin-top:2px}
   .media-item{display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:12px;background:var(--emo-soft);transition:background .3s ease}
   .media-item:hover{background:var(--accent-soft)}
@@ -489,7 +492,7 @@
           </div>
         </div>
         <div class="rec-card">
-          <div class="rec-head"><span class="rec-ico">🎵</span><span class="rec-title">此刻推荐 · 酷狗</span></div>
+          <div class="rec-head"><span class="rec-ico">🎵</span><span class="rec-title">此刻推荐 · 酷狗</span><button class="refresh-btn">🔄 换一批</button></div>
           <div class="media-list" id="rec-music"></div>
         </div>
       </div>
@@ -505,7 +508,7 @@
           </div>
         </div>
         <div class="rec-card">
-          <div class="rec-head"><span class="rec-ico">📚</span><span class="rec-title">此刻推荐 · 微信读书</span></div>
+          <div class="rec-head"><span class="rec-ico">📚</span><span class="rec-title">此刻推荐 · 微信读书</span><button class="refresh-btn">🔄 换一批</button></div>
           <div class="media-list" id="rec-books"></div>
         </div>
       </div>
@@ -993,6 +996,19 @@ function renderMedia(emotion){
   const m=MOOD_MEDIA[emotion]||MOOD_MEDIA.calm;
   renderMediaList('rec-music',m.songs,kgUrl,'music');
   renderMediaList('rec-books',m.books,wrUrl,'ebook');
+}
+function shuffle(arr){ const a=arr.slice(); for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); const t=a[i];a[i]=a[j];a[j]=t; } return a; }
+function refreshMedia(){
+  const em=currentEmotion||'happy';
+  if(cfg.mode==='ai'){
+    aiMedia(em);
+    showToast('正在为你重新推荐…');
+  }else{
+    const m=MOOD_MEDIA[em]||MOOD_MEDIA.calm;
+    renderMediaList('rec-music', shuffle(m.songs), kgUrl, 'music');
+    renderMediaList('rec-books', shuffle(m.books), wrUrl, 'ebook');
+    showToast('已换一批推荐');
+  }
 }
 function extractJSON(text){
   const t=String(text||'').replace(/```json|```/g,'');
@@ -1485,6 +1501,7 @@ renderRecommendations('happy');
 renderMedia('happy');
 initAuth();
 seed();
+document.querySelectorAll('.refresh-btn').forEach(b=>b.onclick=refreshMedia);
 fetchRealWeather();
 </script>
 </body>
