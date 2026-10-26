@@ -1230,9 +1230,16 @@ function showToast(t){
 }
 
 /* ============ 初始引导对话 ============ */
+function weatherGreeting(){
+  const w=TODAY_WEATHER||{type:'晴',temp:21};
+  const map={'晴':'今天阳光正好 ☀️','多云':'今天多云 ☁️','阴':'今天天有点阴 ☁️','小雨':'今天下着小雨 🌧️','大雨':'今天雨挺大 🌧️','雪':'今天下雪了 ❄️'};
+  const d=map[w.type]||('今天是'+w.type+'天');
+  return d+'，'+(w.temp!=null?w.temp+'°C，':'')+'感觉怎么样？';
+}
 function seed(){
-  addBubble('早上好呀，今天天气不错 ☀️ 感觉怎么样？','ai');
-  pushHistory('assistant','早上好呀，今天天气不错，感觉怎么样？');
+  const g=weatherGreeting();
+  addBubble(g,'ai');
+  pushHistory('assistant',g);
   setMood('happy');
 }
 
