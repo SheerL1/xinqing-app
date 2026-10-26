@@ -27,8 +27,9 @@
 
   /* ============ SIDEBAR ============ */
   .sidebar{
-    width:248px;flex:0 0 248px;background:var(--surface);
+    width:248px;flex:0 0 248px;background:rgba(255,255,255,.62);
     border-right:1px solid var(--border);
+    backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
     display:flex;flex-direction:column;padding:30px 20px 24px;
   }
   .brand{display:flex;align-items:center;gap:11px;padding:0 8px}
@@ -1047,10 +1048,6 @@ function initOnboard(){
   const p=PROVIDERS[0];
   document.getElementById('onboard-base').value=p.base;
   document.getElementById('onboard-model').value=p.model;
-  let done=false;
-  try{ done=localStorage.getItem('xq_onboarded')==='1'; }catch(_){}
-  if(done) return;
-  if(cfg.apiKey){ try{localStorage.setItem('xq_onboarded','1');}catch(_){} return; }
   document.getElementById('onboard').style.display='flex';
   const closeOnboard=()=>{document.getElementById('onboard').style.display='none';};
   document.getElementById('onboard-shared').onclick=()=>{
