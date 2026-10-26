@@ -322,7 +322,9 @@
       </button>
     </nav>
     <div class="sidebar-foot">
-      <div class="note">🔒 情绪与配置仅存本机浏览器<br>对话只发往你自己填的接口</div>
+      <div class="ver" id="auth-line" style="font-size:12px;color:var(--muted)">未登录</div>
+      <button id="logout-btn" style="display:none;background:none;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:5px 10px;font-size:12px;cursor:pointer;font-family:var(--sans)">退出登录</button>
+      <div class="note">🔒 数据云端同步 · 按账号隔离</div>
       <div class="ver">心晴 v1.0 · 纯前端</div>
     </div>
   </aside>
@@ -598,6 +600,30 @@
   <div class="toast" id="toast"></div>
 </div>
 
+<!-- ============ 登录 / 注册弹窗 ============ -->
+<div class="overlay" id="auth" style="display:none">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="m-logo">🔐</div>
+      <div class="m-title" id="auth-title">登录心晴</div>
+      <div class="m-sub">登录后，你的情绪记录、喜好、AI 配置都会同步到云端，换设备也不丢。</div>
+    </div>
+    <div class="m-field">
+      <label>用户名</label>
+      <input id="auth-user" spellcheck="false" autocomplete="off" placeholder="2-20 位，字母/数字/中文">
+    </div>
+    <div class="m-field">
+      <label>密码</label>
+      <input id="auth-pass" type="password" autocomplete="off" placeholder="至少 4 位">
+    </div>
+    <div class="m-actions">
+      <button id="auth-go" class="btn-primary">登录</button>
+      <button id="auth-switch" class="btn-ghost">没有账号？注册</button>
+    </div>
+    <div id="auth-msg" style="color:#FF6F66;font-size:12.5px;min-height:18px;margin-top:8px"></div>
+  </div>
+</div>
+
 <!-- ============ 接入 AI 引导弹窗 ============ -->
 <div class="overlay" id="onboard" style="display:none">
   <div class="modal">
@@ -724,6 +750,7 @@ function recordMood(em){
   const key=now.getFullYear()+'-'+(now.getMonth()+1)+'-'+d;
   moodLog[key]={emotion:em, t:Date.now()};
   saveMoodLog();
+  syncSave();
   if(viewY===now.getFullYear()&&viewM===now.getMonth()){
     monthData[d].emotion=em;
     renderSummary(); renderTrend();
@@ -916,6 +943,7 @@ function toggleLike(kind,name,sub){
   if(idx>=0) list.splice(idx,1);
   else list.push(kind==='ebook'?{name:name,author:sub}:{name:name,artist:sub});
   savePrefs(p);
+  syncSave();
 }
 function renderMediaList(id,items,fn,kind){
   const el=document.getElementById(id);
@@ -1006,7 +1034,7 @@ async function aiMedia(emotion){
 const cfg={mode:'ai', baseUrl:'https://api.deepseek.com', apiKey:'', model:'deepseek-flash', aiName:'小晴', aiPersona:'warm', aiCustomPrompt:''};
 const SHARED_BACKEND='https://1503807332-0lay5cky55.ap-guangzhou.tencentscf.com';
 function loadCfg(){try{const s=JSON.parse(localStorage.getItem('xq_cfg')||'{}');Object.assign(cfg,s);}catch(_){}}
-function saveCfg(){try{localStorage.setItem('xq_cfg',JSON.stringify(cfg));}catch(_){}}
+function saveCfg(){try{localStorage.setItem('xq_cfg',JSON.stringify(cfg));}catch(_){} if(typeof syncSave==='function') syncSave();}
 function updateModePill(){const p=document.getElementById('mode-pill');if(p){if(cfg.mode==='rule')p.textContent='规则模式';else if(cfg.apiKey)p.textContent='AI 模式';else p.textContent='DeepSeek 默认';}}
 function updateAiName(){const n=cfg.aiName||'小晴';const a=document.getElementById('ai-name');if(a)a.textContent=n;const b=document.getElementById('ai-name-settings');if(b)b.textContent=n;}
 function apiEndpoint(){
@@ -1100,6 +1128,7 @@ function initOnboard(){
   const p=PROVIDERS[0];
   document.getElementById('onboard-base').value=p.base;
   document.getElementById('onboard-model').value=p.model;
+  if(cfg.apiKey) return;
   document.getElementById('onboard').style.display='flex';
   const closeOnboard=()=>{document.getElementById('onboard').style.display='none';};
   document.getElementById('onboard-shared').onclick=()=>{
@@ -1362,6 +1391,88 @@ function seed(){
   setMood('happy');
 }
 
+/* ============ 认证 & 云同步 ============ */
+const AUTH_KEY='xq_auth';
+let authToken=null, authUser=null;
+function loadAuth(){ try{ const o=JSON.parse(localStorage.getItem(AUTH_KEY)||'{}'); authToken=o.token||null; authUser=o.username||null; }catch(e){ authToken=null; authUser=null; } }
+function saveAuth(){ try{ localStorage.setItem(AUTH_KEY, JSON.stringify({token:authToken, username:authUser})); }catch(e){} }
+function isAuthed(){ return !!authToken; }
+async function apiCall(action, payload){
+  const res = await fetch(SHARED_BACKEND, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(Object.assign({action}, payload)) });
+  const data = await res.json();
+  if(!res.ok || data.error) throw new Error(data.error || ('HTTP '+res.status));
+  return data;
+}
+let syncTimer=null;
+function syncSave(){
+  if(!authToken) return;
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(async ()=>{
+    try{ await apiCall('save', { token: authToken, data: { moodLog, prefs: loadPrefs(), cfg } }); }
+    catch(e){}
+  }, 2000);
+}
+async function syncLoad(){
+  if(!authToken) return;
+  try{
+    const r = await apiCall('load', { token: authToken });
+    if(r.data){
+      if(r.data.moodLog && typeof r.data.moodLog==='object'){ moodLog=r.data.moodLog; saveMoodLog(); }
+      if(r.data.prefs){ savePrefs(r.data.prefs); }
+      if(r.data.cfg && typeof r.data.cfg==='object'){ Object.assign(cfg, r.data.cfg); try{ localStorage.setItem('xq_cfg', JSON.stringify(cfg)); }catch(_){} }
+    }
+  }catch(e){}
+}
+let authMode='login';
+function setAuthMode(mode){
+  authMode=mode;
+  document.getElementById('auth-title').textContent = mode==='login' ? '登录心晴' : '注册新账号';
+  document.getElementById('auth-go').textContent = mode==='login' ? '登录' : '注册';
+  document.getElementById('auth-switch').textContent = mode==='login' ? '没有账号？注册' : '已有账号？登录';
+}
+function refreshAuthLine(){
+  const line=document.getElementById('auth-line');
+  const btn=document.getElementById('logout-btn');
+  if(authUser){ line.textContent='👤 '+authUser; if(btn) btn.style.display='block'; }
+  else { line.textContent='未登录'; if(btn) btn.style.display='none'; }
+}
+async function doAuth(){
+  const u=document.getElementById('auth-user').value.trim();
+  const p=document.getElementById('auth-pass').value;
+  const msg=document.getElementById('auth-msg');
+  msg.textContent='';
+  if(!u||!p){ msg.textContent='请填写用户名和密码'; return; }
+  try{
+    const r=await apiCall(authMode, {username:u, password:p});
+    authToken=r.token; authUser=u; saveAuth(); refreshAuthLine();
+    await syncLoad();
+    document.getElementById('auth').style.display='none';
+    loadMoodLog(); renderCalendar(); updateModePill();
+    if(!cfg.apiKey){ initOnboard(); }
+    showToast(authMode==='login'?'欢迎回来，'+u:'注册成功，欢迎 '+u);
+  }catch(e){
+    msg.textContent=String(e.message||e);
+  }
+}
+function logout(){
+  authToken=null; authUser=null; saveAuth(); refreshAuthLine();
+  document.getElementById('auth').style.display='flex';
+  setAuthMode('login');
+}
+function initAuth(){
+  loadAuth();
+  refreshAuthLine();
+  document.getElementById('auth-go').onclick=doAuth;
+  document.getElementById('auth-switch').onclick=()=>setAuthMode(authMode==='login'?'register':'login');
+  const lb=document.getElementById('logout-btn'); if(lb) lb.onclick=logout;
+  setAuthMode('login');
+  if(isAuthed()){
+    syncLoad().then(()=>{ loadMoodLog(); renderCalendar(); updateModePill(); if(!cfg.apiKey){ initOnboard(); } });
+  }else{
+    document.getElementById('auth').style.display='flex';
+  }
+}
+
 /* ============ 启动 ============ */
 loadMoodLog();
 loadCfg();
@@ -1372,7 +1483,7 @@ renderCalendar();
 renderForecast();
 renderRecommendations('happy');
 renderMedia('happy');
-initOnboard();
+initAuth();
 seed();
 fetchRealWeather();
 </script>
